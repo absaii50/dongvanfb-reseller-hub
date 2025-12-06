@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { MailMessage } from '@/lib/types';
@@ -16,7 +17,8 @@ import {
   Code,
   Inbox,
   RefreshCw,
-  Copy
+  Copy,
+  Eye
 } from 'lucide-react';
 
 export default function Tools() {
@@ -32,6 +34,7 @@ export default function Tools() {
   
   // Get Code state
   const [sender, setSender] = useState('');
+  const [selectedEmail, setSelectedEmail] = useState<MailMessage | null>(null);
   const [codeResult, setCodeResult] = useState<{ code: string; message?: string } | null>(null);
 
   const handleReadMailbox = async () => {
@@ -317,7 +320,11 @@ export default function Tools() {
                         const bodyText = (msg.body || msg.message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
                         
                         return (
-                          <div key={i} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
+                          <div 
+                            key={i} 
+                            className="p-4 rounded-lg bg-secondary/30 border border-border/30 cursor-pointer hover:bg-secondary/50 transition-colors"
+                            onClick={() => setSelectedEmail(msg)}
+                          >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium truncate">{msg.subject || 'No Subject'}</p>
@@ -325,11 +332,14 @@ export default function Tools() {
                                   From: {fromDisplay}
                                 </p>
                               </div>
-                              {dateDisplay && (
-                                <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
-                                  {dateDisplay}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {dateDisplay && (
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    {dateDisplay}
+                                  </span>
+                                )}
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              </div>
                             </div>
                             {msg.code && (
                               <div className="mb-2 p-2 bg-success/10 border border-success/20 rounded">
@@ -338,7 +348,7 @@ export default function Tools() {
                               </div>
                             )}
                             {bodyText && (
-                              <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{bodyText.slice(0, 300)}{bodyText.length > 300 ? '...' : ''}</p>
+                              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{bodyText.slice(0, 200)}{bodyText.length > 200 ? '...' : ''}</p>
                             )}
                           </div>
                         );
@@ -397,6 +407,30 @@ export default function Tools() {
           </Card>
         </div>
       </div>
+
+      {/* Email Detail Modal */}
+      <Dialog open={!!selectedEmail} onOpenChange={() => setSelectedEmail(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{selectedEmail?.subject || 'Email Details'}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              From: {typeof selectedEmail?.from === 'string' 
+                ? selectedEmail.from 
+                : Array.isArray(selectedEmail?.from) && selectedEmail.from[0]
+                  ? (selectedEmail.from[0] as { name?: string; address?: string }).name || (selectedEmail.from[0] as { address?: string }).address
+                  : 'Unknown'}
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-white rounded-lg">
+            <iframe
+              srcDoc={selectedEmail?.body || selectedEmail?.message || '<p>No content</p>'}
+              className="w-full min-h-[400px] border-0"
+              title="Email content"
+              sandbox="allow-same-origin"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
