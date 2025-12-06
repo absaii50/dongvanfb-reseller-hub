@@ -312,34 +312,80 @@ export default function Dashboard() {
 
       {/* Order Details Modal */}
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
           </DialogHeader>
-          {selectedOrder?.mail_data && Array.isArray(selectedOrder.mail_data) && (
+          {selectedOrder && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {(selectedOrder.mail_data as MailData[]).length} account(s)
-                </p>
-                <Button variant="outline" size="sm" onClick={() => downloadMailData(selectedOrder)}>
-                  <Download className="h-4 w-4 mr-1" />
-                  Download All
-                </Button>
+              {/* Order Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-secondary/30">
+                <div>
+                  <p className="text-xs text-muted-foreground">Order ID</p>
+                  <p className="font-mono text-sm">{selectedOrder.id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Product</p>
+                  <p className="font-medium">{selectedOrder.product?.name || 'Unknown'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Quantity</p>
+                  <p className="font-medium">{selectedOrder.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Price</p>
+                  <p className="font-medium text-primary">${selectedOrder.total_price.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  {getStatusBadge(selectedOrder.status)}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Date</p>
+                  <p className="text-sm">{new Date(selectedOrder.created_at).toLocaleString()}</p>
+                </div>
               </div>
-              <div className="max-h-[400px] overflow-y-auto space-y-2">
-                {(selectedOrder.mail_data as MailData[]).map((mail, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-secondary/50 font-mono text-sm">
-                    <p className="text-primary">{mail.email}</p>
-                    <p className="text-muted-foreground">{mail.password}</p>
-                    {mail.refresh_token && (
-                      <p className="text-xs text-muted-foreground truncate mt-1">
-                        Token: {mail.refresh_token.slice(0, 50)}...
-                      </p>
-                    )}
+
+              {/* Mail Data */}
+              {selectedOrder.mail_data && Array.isArray(selectedOrder.mail_data) && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">
+                      Mail Accounts ({(selectedOrder.mail_data as MailData[]).length})
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => downloadMailData(selectedOrder)}>
+                      <Download className="h-4 w-4 mr-1" />
+                      Download All
+                    </Button>
                   </div>
-                ))}
-              </div>
+                  <div className="max-h-[300px] overflow-y-auto space-y-2">
+                    {(selectedOrder.mail_data as MailData[]).map((mail, i) => (
+                      <div key={i} className="p-3 rounded-lg bg-secondary/50 font-mono text-xs space-y-1">
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-16">Email:</span>
+                          <span className="text-primary break-all">{mail.email}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground w-16">Password:</span>
+                          <span className="break-all">{mail.password}</span>
+                        </div>
+                        {mail.refresh_token && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground w-16">Token:</span>
+                            <span className="break-all text-muted-foreground">{mail.refresh_token}</span>
+                          </div>
+                        )}
+                        {mail.client_id && (
+                          <div className="flex gap-2">
+                            <span className="text-muted-foreground w-16">Client ID:</span>
+                            <span className="break-all text-muted-foreground">{mail.client_id}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>
