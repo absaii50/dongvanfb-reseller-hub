@@ -54,8 +54,13 @@ export default function Admin() {
     description: '',
     price: '',
     dongvan_id: '',
+    live_duration: '',
     is_active: true
   });
+
+  // User balance editing
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [balanceAmount, setBalanceAmount] = useState('');
 
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
@@ -144,6 +149,7 @@ export default function Admin() {
         description: productForm.description,
         price: parseFloat(productForm.price),
         dongvan_id: parseInt(productForm.dongvan_id),
+        live_duration: productForm.live_duration || null,
         is_active: productForm.is_active
       };
 
@@ -163,7 +169,35 @@ export default function Admin() {
       }
 
       setEditingProduct(null);
-      setProductForm({ name: '', description: '', price: '', dongvan_id: '', is_active: true });
+      setProductForm({ name: '', description: '', price: '', dongvan_id: '', live_duration: '', is_active: true });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const updateUserBalance = async () => {
+    if (!editingUser) return;
+    try {
+      const amount = parseFloat(balanceAmount);
+      if (isNaN(amount)) throw new Error('Invalid amount');
+
+      const newBalance = editingUser.balance + amount;
+      if (newBalance < 0) throw new Error('Balance cannot be negative');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ balance: newBalance })
+        .eq('id', editingUser.id);
+      
+      if (error) throw error;
+      
+      toast({ 
+        title: 'Success', 
+        description: `${amount >= 0 ? 'Added' : 'Deducted'} $${Math.abs(amount).toFixed(2)} ${amount >= 0 ? 'to' : 'from'} ${editingUser.email}` 
+      });
+      setEditingUser(null);
+      setBalanceAmount('');
       fetchData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -306,7 +340,7 @@ export default function Admin() {
                   <CardDescription>Manage your mail products and pricing</CardDescription>
                 </div>
                 <Button onClick={() => {
-                  setProductForm({ name: '', description: '', price: '', dongvan_id: '', is_active: true });
+                  setProductForm({ name: '', description: '', price: '', dongvan_id: '', live_duration: '', is_active: true });
                   setEditingProduct({} as Product);
                 }}>
                   <Plus className="h-4 w-4 mr-1" />
@@ -320,6 +354,7 @@ export default function Admin() {
                       <tr className="border-b border-border/50">
                         <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Name</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">DongVan ID</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Live</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Price</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Stock</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Active</th>
@@ -331,6 +366,7 @@ export default function Admin() {
                         <tr key={product.id} className="border-b border-border/30">
                           <td className="py-3 px-2">{product.name}</td>
                           <td className="py-3 px-2 text-center">{product.dongvan_id}</td>
+                          <td className="py-3 px-2 text-center text-muted-foreground">{product.live_duration || '-'}</td>
                           <td className="py-3 px-2 text-center text-primary font-medium">${product.price.toFixed(2)}</td>
                           <td className="py-3 px-2 text-center">{product.stock}</td>
                           <td className="py-3 px-2 text-center">
@@ -347,6 +383,7 @@ export default function Admin() {
                                   description: product.description || '',
                                   price: product.price.toString(),
                                   dongvan_id: product.dongvan_id.toString(),
+                                  live_duration: product.live_duration || '',
                                   is_active: product.is_active
                                 });
                               }}>
@@ -361,7 +398,7 @@ export default function Admin() {
                       ))}
                       {products.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                          <td colSpan={7} className="py-8 text-center text-muted-foreground">
                             No products yet. Click "Sync Products" to fetch from DongVanFB.
                           </td>
                         </tr>
@@ -433,6 +470,7 @@ export default function Admin() {
                         <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Email</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Balance</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Joined</th>
+                        <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -443,11 +481,20 @@ export default function Admin() {
                           <td className="py-3 px-2 text-center text-sm text-muted-foreground">
                             {new Date(userProfile.created_at).toLocaleDateString()}
                           </td>
+                          <td className="py-3 px-2 text-right">
+                            <Button variant="ghost" size="sm" onClick={() => {
+                              setEditingUser(userProfile);
+                              setBalanceAmount('');
+                            }}>
+                              <Wallet className="h-4 w-4 mr-1" />
+                              Add Balance
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                       {users.length === 0 && (
                         <tr>
-                          <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                          <td colSpan={4} className="py-8 text-center text-muted-foreground">
                             No users yet.
                           </td>
                         </tr>
@@ -505,6 +552,14 @@ export default function Admin() {
                 />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Live Duration</Label>
+              <Input
+                value={productForm.live_duration}
+                onChange={(e) => setProductForm({ ...productForm, live_duration: e.target.value })}
+                placeholder="e.g., 1-3 Hours, 6-12 Months"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Switch
                 checked={productForm.is_active}
@@ -518,6 +573,48 @@ export default function Admin() {
             <Button onClick={saveProduct}>
               <Save className="h-4 w-4 mr-1" />
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Balance Dialog */}
+      <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust User Balance</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <p className="text-sm text-muted-foreground">User</p>
+              <p className="font-medium">{editingUser?.email}</p>
+              <p className="text-sm text-muted-foreground mt-2">Current Balance</p>
+              <p className="text-xl font-bold text-primary">${editingUser?.balance.toFixed(2)}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Amount to Add/Deduct (use negative for deduction)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={balanceAmount}
+                onChange={(e) => setBalanceAmount(e.target.value)}
+                placeholder="10.00 or -5.00"
+              />
+            </div>
+            {balanceAmount && !isNaN(parseFloat(balanceAmount)) && (
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <p className="text-sm text-muted-foreground">New Balance</p>
+                <p className="text-lg font-bold text-primary">
+                  ${((editingUser?.balance || 0) + parseFloat(balanceAmount)).toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
+            <Button onClick={updateUserBalance} disabled={!balanceAmount}>
+              <Save className="h-4 w-4 mr-1" />
+              Update Balance
             </Button>
           </DialogFooter>
         </DialogContent>

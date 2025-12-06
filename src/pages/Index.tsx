@@ -180,6 +180,7 @@ export default function Index() {
                   <tr className="border-b border-border/50">
                     <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">ID</th>
                     <th className="text-left py-4 px-4 text-sm font-medium text-muted-foreground">Product</th>
+                    <th className="text-center py-4 px-4 text-sm font-medium text-muted-foreground">Live</th>
                     <th className="text-center py-4 px-4 text-sm font-medium text-muted-foreground">Status</th>
                     <th className="text-center py-4 px-4 text-sm font-medium text-muted-foreground">Price</th>
                     <th className="text-center py-4 px-4 text-sm font-medium text-muted-foreground">Stock</th>
@@ -209,6 +210,11 @@ export default function Index() {
                             )}
                           </div>
                         </div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <span className="text-muted-foreground text-sm">
+                          {product.live_duration || '-'}
+                        </span>
                       </td>
                       <td className="py-4 px-4 text-center">
                         {product.stock > 0 ? (
