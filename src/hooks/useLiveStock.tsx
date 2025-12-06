@@ -25,7 +25,7 @@ export function useLiveStock(intervalMs: number = 10000): UseLiveStockReturn {
     
     try {
       const { data, error: fnError } = await supabase.functions.invoke('dongvan-api', {
-        body: { action: 'products' }
+        body: { action: 'get_products' }
       });
 
       if (fnError) throw fnError;
