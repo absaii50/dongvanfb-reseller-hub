@@ -11,6 +11,7 @@ import Deposit from "./pages/Deposit";
 import Buy from "./pages/Buy";
 import Tools from "./pages/Tools";
 import Admin from "./pages/Admin";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/buy/:productId" element={<Buy />} />
             <Route path="/tools" element={<Tools />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
