@@ -9,6 +9,7 @@ interface LiveStockData {
 interface UseLiveStockReturn {
   liveStock: Record<number, number>;
   isChecking: boolean;
+  isInitialLoading: boolean;
   lastChecked: Date | null;
   error: string | null;
 }
@@ -16,6 +17,7 @@ interface UseLiveStockReturn {
 export function useLiveStock(intervalMs: number = 10000): UseLiveStockReturn {
   const [liveStock, setLiveStock] = useState<Record<number, number>>({});
   const [isChecking, setIsChecking] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,10 +39,12 @@ export function useLiveStock(intervalMs: number = 10000): UseLiveStockReturn {
         });
         setLiveStock(stockMap);
         setLastChecked(new Date());
+        setIsInitialLoading(false);
       }
     } catch (err) {
       console.error('Live stock check failed:', err);
       setError('Failed to fetch live stock');
+      setIsInitialLoading(false);
     } finally {
       setIsChecking(false);
     }
@@ -56,5 +60,5 @@ export function useLiveStock(intervalMs: number = 10000): UseLiveStockReturn {
     return () => clearInterval(interval);
   }, [checkStock, intervalMs]);
 
-  return { liveStock, isChecking, lastChecked, error };
+  return { liveStock, isChecking, isInitialLoading, lastChecked, error };
 }
