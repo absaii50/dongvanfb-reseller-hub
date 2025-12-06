@@ -34,6 +34,24 @@ const sanitizeString = (str: unknown, maxLength = 500): string => {
   return str.trim().slice(0, maxLength);
 };
 
+// Helper to safely parse JSON responses from external APIs
+const safeJsonParse = async (response: Response, context: string): Promise<any> => {
+  const text = await response.text();
+  
+  // Check if response looks like HTML (error page)
+  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+    console.error(`${context}: Received HTML instead of JSON (status: ${response.status})`);
+    throw new Error(`External API returned HTML error page (status: ${response.status})`);
+  }
+  
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    console.error(`${context}: Failed to parse JSON:`, text.slice(0, 200));
+    throw new Error(`Failed to parse API response: ${e instanceof Error ? e.message : 'Invalid JSON'}`);
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -91,7 +109,7 @@ serve(async (req) => {
         }
         
         const response = await fetch(`${DONGVAN_API_BASE}/user/balance?apikey=${apiKey}`);
-        const data = await response.json();
+        const data = await safeJsonParse(response, 'DongVan balance');
         console.log('DongVan balance response:', data);
         return new Response(JSON.stringify({
           success: data.status,
@@ -105,7 +123,7 @@ serve(async (req) => {
       case 'get_products': {
         // Public endpoint - products info is meant to be visible
         const response = await fetch(`${DONGVAN_API_BASE}/user/account_type?apikey=${apiKey}`);
-        const data = await response.json();
+        const data = await safeJsonParse(response, 'DongVan products');
         console.log('DongVan products response:', data);
         
         // Filter to only allowed products (exclude PVA)
@@ -216,7 +234,7 @@ serve(async (req) => {
         console.log('Buying from DongVan:', buyUrl);
         
         const response = await fetch(buyUrl);
-        const data = await response.json();
+        const data = await safeJsonParse(response, 'DongVan buy');
         
         console.log('DongVan buy response:', data);
         
@@ -308,7 +326,7 @@ serve(async (req) => {
               client_id: sanitizedClientId
             })
           });
-          const data = await response.json();
+          const data = await safeJsonParse(response, 'DongVan graph_messages');
           console.log('DongVan graph_messages response:', JSON.stringify(data).slice(0, 500));
           
           return new Response(JSON.stringify({
@@ -333,7 +351,7 @@ serve(async (req) => {
               type: 'all'
             })
           });
-          const data = await response.json();
+          const data = await safeJsonParse(response, 'DongVan password-based');
           console.log('DongVan password-based response:', JSON.stringify(data).slice(0, 500));
           
           return new Response(JSON.stringify({
@@ -387,7 +405,7 @@ serve(async (req) => {
               type
             })
           });
-          const data = await response.json();
+          const data = await safeJsonParse(response, 'DongVan getcode OAuth2');
           console.log('DongVan getcode (OAuth2) response:', data);
           
           return new Response(JSON.stringify({
@@ -403,7 +421,7 @@ serve(async (req) => {
         const response = await fetch(
           `${DONGVAN_API_BASE}/user/get_code_facebook?apikey=${apiKey}&email=${encodeURIComponent(sanitizedEmail)}`
         );
-        const data = await response.json();
+        const data = await safeJsonParse(response, 'DongVan getcode Facebook');
         
         console.log('DongVan getcode response:', data);
         
