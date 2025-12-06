@@ -98,6 +98,7 @@ export type Database = {
           dongvan_id: number
           id: string
           is_active: boolean
+          live_duration: string | null
           name: string
           price: number
           stock: number
@@ -109,6 +110,7 @@ export type Database = {
           dongvan_id: number
           id?: string
           is_active?: boolean
+          live_duration?: string | null
           name: string
           price: number
           stock?: number
@@ -120,6 +122,7 @@ export type Database = {
           dongvan_id?: number
           id?: string
           is_active?: boolean
+          live_duration?: string | null
           name?: string
           price?: number
           stock?: number

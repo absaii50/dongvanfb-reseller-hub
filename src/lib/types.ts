@@ -6,6 +6,7 @@ export interface Product {
   price: number;
   stock: number;
   is_active: boolean;
+  live_duration: string | null;
   created_at: string;
   updated_at: string;
 }
