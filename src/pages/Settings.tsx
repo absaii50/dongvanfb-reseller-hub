@@ -1,17 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Mail, Wallet, Shield, Loader2, AtSign } from 'lucide-react';
+import { User, Lock, Mail, Wallet, Shield, Loader2, AtSign, Bell, ShoppingCart, CreditCard, AlertTriangle, Megaphone } from 'lucide-react';
+
+interface NotificationPreferences {
+  order_confirmations: boolean;
+  deposit_confirmations: boolean;
+  low_balance_alerts: boolean;
+  promotional_emails: boolean;
+}
+
+const defaultPreferences: NotificationPreferences = {
+  order_confirmations: true,
+  deposit_confirmations: true,
+  low_balance_alerts: true,
+  promotional_emails: false,
+};
 
 export default function Settings() {
-  const { user, profile, isAdmin } = useAuth();
+  const { user, profile, isAdmin, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -23,6 +38,25 @@ export default function Settings() {
   // Email change state
   const [newEmail, setNewEmail] = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
+  
+  // Notification preferences state
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>(defaultPreferences);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+
+  // Load notification preferences from profile
+  useEffect(() => {
+    if (profile) {
+      const prefs = (profile as any).notification_preferences;
+      if (prefs) {
+        setNotificationPrefs({
+          order_confirmations: prefs.order_confirmations ?? true,
+          deposit_confirmations: prefs.deposit_confirmations ?? true,
+          low_balance_alerts: prefs.low_balance_alerts ?? true,
+          promotional_emails: prefs.promotional_emails ?? false,
+        });
+      }
+    }
+  }, [profile]);
 
   // Redirect if not logged in
   if (!user) {
@@ -95,7 +129,6 @@ export default function Settings() {
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newEmail)) {
       toast({
@@ -138,6 +171,42 @@ export default function Settings() {
       });
     } finally {
       setEmailLoading(false);
+    }
+  };
+
+  const handleNotificationChange = async (key: keyof NotificationPreferences, value: boolean) => {
+    const newPrefs = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(newPrefs);
+    
+    setNotificationLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_preferences: newPrefs })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Preferences Updated',
+        description: 'Your notification preferences have been saved.',
+      });
+      
+      // Refresh profile to sync state
+      if (refreshProfile) {
+        refreshProfile();
+      }
+    } catch (error: any) {
+      console.error('Notification preferences error:', error);
+      // Revert on error
+      setNotificationPrefs(notificationPrefs);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update preferences.',
+        variant: 'destructive',
+      });
+    } finally {
+      setNotificationLoading(false);
     }
   };
 
@@ -196,6 +265,78 @@ export default function Settings() {
                       : new Date(user.created_at).toLocaleDateString()}
                   </span>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notification Preferences */}
+          <Card className="bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription>Manage your email notifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-3">
+                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-sm">Order Confirmations</p>
+                    <p className="text-xs text-muted-foreground">Get notified when your order is complete</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={notificationPrefs.order_confirmations}
+                  onCheckedChange={(value) => handleNotificationChange('order_confirmations', value)}
+                  disabled={notificationLoading}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-sm">Deposit Confirmations</p>
+                    <p className="text-xs text-muted-foreground">Get notified when deposits are received</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={notificationPrefs.deposit_confirmations}
+                  onCheckedChange={(value) => handleNotificationChange('deposit_confirmations', value)}
+                  disabled={notificationLoading}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-sm">Low Balance Alerts</p>
+                    <p className="text-xs text-muted-foreground">Get alerted when balance is low</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={notificationPrefs.low_balance_alerts}
+                  onCheckedChange={(value) => handleNotificationChange('low_balance_alerts', value)}
+                  disabled={notificationLoading}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/30">
+                <div className="flex items-center gap-3">
+                  <Megaphone className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-sm">Promotional Emails</p>
+                    <p className="text-xs text-muted-foreground">Receive offers and product updates</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={notificationPrefs.promotional_emails}
+                  onCheckedChange={(value) => handleNotificationChange('promotional_emails', value)}
+                  disabled={notificationLoading}
+                />
               </div>
             </CardContent>
           </Card>
@@ -300,7 +441,7 @@ export default function Settings() {
           </Card>
 
           {/* Quick Actions */}
-          <Card className="bg-card/50 border-border/50">
+          <Card className="bg-card/50 border-border/50 md:col-span-2">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Common account actions</CardDescription>
