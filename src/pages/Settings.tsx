@@ -8,17 +8,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Mail, Wallet, Shield, Loader2 } from 'lucide-react';
+import { User, Lock, Mail, Wallet, Shield, Loader2, AtSign } from 'lucide-react';
 
 export default function Settings() {
   const { user, profile, isAdmin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const [currentPassword, setCurrentPassword] = useState('');
+  // Password change state
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  
+  // Email change state
+  const [newEmail, setNewEmail] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
 
   // Redirect if not logged in
   if (!user) {
@@ -54,7 +58,7 @@ export default function Settings() {
       return;
     }
 
-    setLoading(true);
+    setPasswordLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({
         password: newPassword
@@ -67,7 +71,6 @@ export default function Settings() {
         description: 'Your password has been changed successfully.',
       });
       
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
@@ -78,7 +81,63 @@ export default function Settings() {
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleEmailChange = async () => {
+    if (!newEmail) {
+      toast({
+        title: 'Missing Email',
+        description: 'Please enter a new email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      toast({
+        title: 'Invalid Email',
+        description: 'Please enter a valid email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newEmail === user.email) {
+      toast({
+        title: 'Same Email',
+        description: 'New email is the same as current email.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setEmailLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        email: newEmail
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Confirmation Email Sent',
+        description: 'Please check your new email inbox to confirm the change.',
+      });
+      
+      setNewEmail('');
+    } catch (error: any) {
+      console.error('Email change error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update email.',
+        variant: 'destructive',
+      });
+    } finally {
+      setEmailLoading(false);
     }
   };
 
@@ -141,6 +200,54 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+          {/* Change Email */}
+          <Card className="bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AtSign className="h-5 w-5" />
+                Change Email
+              </CardTitle>
+              <CardDescription>Update your email address</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Current Email</Label>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-secondary/30 border border-border/30">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{user.email}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>New Email Address</Label>
+                <Input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Enter new email address"
+                  className="bg-secondary/50 border-border/50"
+                />
+              </div>
+
+              <Button 
+                onClick={handleEmailChange} 
+                disabled={emailLoading}
+                variant="glow"
+                className="w-full"
+              >
+                {emailLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Update Email'
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground text-center">
+                A confirmation link will be sent to your new email
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Change Password */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
@@ -175,11 +282,11 @@ export default function Settings() {
 
               <Button 
                 onClick={handlePasswordChange} 
-                disabled={loading}
+                disabled={passwordLoading}
                 variant="glow"
                 className="w-full"
               >
-                {loading ? (
+                {passwordLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   'Update Password'
@@ -193,7 +300,7 @@ export default function Settings() {
           </Card>
 
           {/* Quick Actions */}
-          <Card className="bg-card/50 border-border/50 md:col-span-2">
+          <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Common account actions</CardDescription>
