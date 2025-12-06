@@ -6,6 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation constants
+const MIN_DEPOSIT_AMOUNT = 5;
+const MAX_DEPOSIT_AMOUNT = 10000;
+const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp'];
+
+// Validation helpers
+const isValidAmount = (val: unknown): val is number => {
+  return typeof val === 'number' && 
+         isFinite(val) && 
+         val >= MIN_DEPOSIT_AMOUNT && 
+         val <= MAX_DEPOSIT_AMOUNT;
+};
+
+const isValidCurrency = (val: unknown): val is string => {
+  return typeof val === 'string' && ALLOWED_CURRENCIES.includes(val.toLowerCase());
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -41,10 +58,24 @@ serve(async (req) => {
       });
     }
     
-    const { amount, currency = 'usd' } = await req.json();
+    const body = await req.json();
+    const { amount, currency = 'usd' } = body;
     
-    if (!amount || amount <= 0) {
-      return new Response(JSON.stringify({ error: 'Invalid amount' }), {
+    // SECURITY: Validate amount with min/max limits
+    if (!isValidAmount(amount)) {
+      return new Response(JSON.stringify({ 
+        error: `Invalid amount. Must be between $${MIN_DEPOSIT_AMOUNT} and $${MAX_DEPOSIT_AMOUNT.toLocaleString()}` 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    // SECURITY: Validate currency
+    if (!isValidCurrency(currency)) {
+      return new Response(JSON.stringify({ 
+        error: `Invalid currency. Allowed: ${ALLOWED_CURRENCIES.join(', ').toUpperCase()}` 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -61,7 +92,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         price_amount: amount,
-        price_currency: currency,
+        price_currency: currency.toLowerCase(),
         order_id: `deposit_${user.id}_${Date.now()}`,
         order_description: `CryptoMails Deposit - $${amount}`,
         ipn_callback_url: `${supabaseUrl}/functions/v1/nowpayments-webhook`,

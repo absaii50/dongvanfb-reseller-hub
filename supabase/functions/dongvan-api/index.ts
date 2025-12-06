@@ -10,6 +10,30 @@ const DONGVAN_API_BASE = 'https://api.dongvanfb.net';
 const DONGVAN_TOOLS_BASE = 'https://tools.dongvanfb.net';
 const ALLOWED_PRODUCT_IDS = [1, 2, 3, 5, 6, 59, 60];
 
+// Input validation helpers
+const isValidUUID = (str: string): boolean => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
+const isValidEmail = (str: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(str) && str.length <= 255;
+};
+
+const isPositiveInteger = (val: unknown): val is number => {
+  return typeof val === 'number' && Number.isInteger(val) && val > 0;
+};
+
+const isPositiveNumber = (val: unknown): val is number => {
+  return typeof val === 'number' && val > 0 && isFinite(val);
+};
+
+const sanitizeString = (str: unknown, maxLength = 500): string => {
+  if (typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLength);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -32,6 +56,40 @@ serve(async (req) => {
     
     switch (action) {
       case 'get_balance': {
+        // SECURITY: Require admin authentication for balance endpoint
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'Unauthorized - Admin access required' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (authError || !user) {
+          return new Response(JSON.stringify({ error: 'Invalid token' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // Verify admin role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .single();
+        
+        if (!roleData) {
+          return new Response(JSON.stringify({ error: 'Forbidden - Admin access required' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
         const response = await fetch(`${DONGVAN_API_BASE}/user/balance?apikey=${apiKey}`);
         const data = await response.json();
         console.log('DongVan balance response:', data);
@@ -45,6 +103,7 @@ serve(async (req) => {
       }
       
       case 'get_products': {
+        // Public endpoint - products info is meant to be visible
         const response = await fetch(`${DONGVAN_API_BASE}/user/account_type?apikey=${apiKey}`);
         const data = await response.json();
         console.log('DongVan products response:', data);
@@ -85,6 +144,28 @@ serve(async (req) => {
         
         const { product_id, quantity, total_price } = params;
         
+        // SECURITY: Validate input parameters
+        if (!product_id || !isValidUUID(product_id)) {
+          return new Response(JSON.stringify({ error: 'Invalid product_id format' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (!isPositiveInteger(quantity) || quantity > 100) {
+          return new Response(JSON.stringify({ error: 'Quantity must be a positive integer (max 100)' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        if (!isPositiveNumber(total_price) || total_price > 10000) {
+          return new Response(JSON.stringify({ error: 'Invalid total_price (max $10,000)' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
         // Get user profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -109,12 +190,22 @@ serve(async (req) => {
         // Get product from our database to get dongvan_id
         const { data: product, error: productError } = await supabase
           .from('products')
-          .select('dongvan_id')
+          .select('dongvan_id, price')
           .eq('id', product_id)
           .single();
         
         if (productError || !product) {
           return new Response(JSON.stringify({ error: 'Product not found' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // SECURITY: Verify total_price matches product price * quantity
+        const expectedPrice = product.price * quantity;
+        if (Math.abs(total_price - expectedPrice) > 0.01) {
+          console.error(`Price mismatch: expected ${expectedPrice}, got ${total_price}`);
+          return new Response(JSON.stringify({ error: 'Price mismatch - please refresh and try again' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
@@ -191,23 +282,30 @@ serve(async (req) => {
       case 'read_mailbox': {
         const { email, password, refresh_token, client_id } = params;
         
-        if (!email) {
-          return new Response(JSON.stringify({ error: 'Email required' }), {
+        // SECURITY: Validate email format
+        const sanitizedEmail = sanitizeString(email, 255);
+        if (!sanitizedEmail || !isValidEmail(sanitizedEmail)) {
+          return new Response(JSON.stringify({ error: 'Invalid email format' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
+        // Sanitize other inputs
+        const sanitizedPassword = sanitizeString(password, 500);
+        const sanitizedRefreshToken = sanitizeString(refresh_token, 2000);
+        const sanitizedClientId = sanitizeString(client_id, 100);
+        
         // For Graph API mails with OAuth2 tokens - use graph_messages endpoint
-        if (refresh_token && client_id) {
+        if (sanitizedRefreshToken && sanitizedClientId) {
           console.log('Using OAuth2 Graph API for reading messages...');
           const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/graph_messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email,
-              refresh_token,
-              client_id
+              email: sanitizedEmail,
+              refresh_token: sanitizedRefreshToken,
+              client_id: sanitizedClientId
             })
           });
           const data = await response.json();
@@ -223,14 +321,14 @@ serve(async (req) => {
         }
         
         // For IMAP/password-based mails - try get_code_oauth2 with type=all
-        if (password) {
+        if (sanitizedPassword) {
           console.log('Using password-based auth for reading messages...');
           const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email,
-              refresh_token: password,
+              email: sanitizedEmail,
+              refresh_token: sanitizedPassword,
               client_id: '',
               type: 'all'
             })
@@ -259,25 +357,33 @@ serve(async (req) => {
       case 'get_code': {
         const { email, password, sender, refresh_token, client_id } = params;
         
-        if (!email) {
-          return new Response(JSON.stringify({ error: 'Email required' }), {
+        // SECURITY: Validate email format
+        const sanitizedEmail = sanitizeString(email, 255);
+        if (!sanitizedEmail || !isValidEmail(sanitizedEmail)) {
+          return new Response(JSON.stringify({ error: 'Invalid email format' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
-        // Determine the type based on sender
-        const type = sender || 'facebook';
+        // Sanitize other inputs
+        const sanitizedRefreshToken = sanitizeString(refresh_token, 2000);
+        const sanitizedClientId = sanitizeString(client_id, 100);
+        const sanitizedSender = sanitizeString(sender, 50);
+        
+        // Determine the type based on sender (whitelist allowed values)
+        const allowedTypes = ['facebook', 'google', 'microsoft', 'all'];
+        const type = allowedTypes.includes(sanitizedSender) ? sanitizedSender : 'facebook';
         
         // For Graph API mails with OAuth2
-        if (refresh_token && client_id) {
+        if (sanitizedRefreshToken && sanitizedClientId) {
           const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              email,
-              refresh_token,
-              client_id,
+              email: sanitizedEmail,
+              refresh_token: sanitizedRefreshToken,
+              client_id: sanitizedClientId,
               type
             })
           });
@@ -295,7 +401,7 @@ serve(async (req) => {
         
         // For simple Facebook code retrieval
         const response = await fetch(
-          `${DONGVAN_API_BASE}/user/get_code_facebook?apikey=${apiKey}&email=${encodeURIComponent(email)}`
+          `${DONGVAN_API_BASE}/user/get_code_facebook?apikey=${apiKey}&email=${encodeURIComponent(sanitizedEmail)}`
         );
         const data = await response.json();
         
