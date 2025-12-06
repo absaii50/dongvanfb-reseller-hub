@@ -367,10 +367,24 @@ export default function Dashboard() {
                     <p className="text-sm font-medium">
                       Mail Accounts ({(selectedOrder.mail_data as MailData[]).length})
                     </p>
-                    <Button variant="outline" size="sm" onClick={() => downloadMailData(selectedOrder)}>
-                      <Download className="h-4 w-4 mr-1" />
-                      Download All
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          const allData = (selectedOrder.mail_data as MailData[]).map(formatMailData).join('\n');
+                          navigator.clipboard.writeText(allData);
+                          toast.success('All accounts copied to clipboard');
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy All
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => downloadMailData(selectedOrder)}>
+                        <Download className="h-4 w-4 mr-1" />
+                        Download All
+                      </Button>
+                    </div>
                   </div>
                   <div className="max-h-[300px] overflow-y-auto space-y-2">
                     {(selectedOrder.mail_data as MailData[]).map((mail, i) => {
