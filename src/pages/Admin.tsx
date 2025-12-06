@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Product, Order, Profile } from '@/lib/types';
 import { 
-  Settings, 
   Loader2, 
   Package,
   ShoppingBag,
@@ -41,6 +40,8 @@ export default function Admin() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [checkingBalance, setCheckingBalance] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
@@ -92,26 +93,47 @@ export default function Admin() {
   };
 
   const checkApiBalance = async () => {
+    setCheckingBalance(true);
     try {
-      const { data, error } = await supabase.functions.invoke('check-dongvan-balance');
+      const { data, error } = await supabase.functions.invoke('dongvan-api', {
+        body: { action: 'get_balance' }
+      });
+      
       if (error) throw error;
-      if (data.balance !== undefined) {
-        setApiBalance(data.balance);
-        toast({ title: 'Balance Updated', description: `DongVanFB Balance: ${data.balance}₫` });
+      
+      if (data.success && data.data?.balance !== undefined) {
+        setApiBalance(data.data.balance);
+        toast({ title: 'Balance Updated', description: `DongVanFB Balance: ${data.data.balance.toLocaleString()}₫` });
+      } else {
+        throw new Error(data.message || 'Failed to fetch balance');
       }
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setCheckingBalance(false);
     }
   };
 
   const syncProducts = async () => {
+    setSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('sync-products');
+      
       if (error) throw error;
-      toast({ title: 'Success', description: 'Products synced from DongVanFB' });
-      fetchData();
+      
+      if (data.success) {
+        toast({ 
+          title: 'Success', 
+          description: data.message || `Synced ${data.synced} products (${data.created} new, ${data.updated} updated)` 
+        });
+        fetchData();
+      } else {
+        throw new Error(data.error || 'Sync failed');
+      }
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -125,7 +147,7 @@ export default function Admin() {
         is_active: productForm.is_active
       };
 
-      if (editingProduct) {
+      if (editingProduct?.id) {
         const { error } = await supabase
           .from('products')
           .update(productData)
@@ -192,12 +214,20 @@ export default function Admin() {
             <p className="text-muted-foreground">Manage products, orders, and users</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={checkApiBalance}>
-              <Wallet className="h-4 w-4 mr-1" />
+            <Button variant="outline" onClick={checkApiBalance} disabled={checkingBalance}>
+              {checkingBalance ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Wallet className="h-4 w-4 mr-1" />
+              )}
               {apiBalance !== null ? `${apiBalance.toLocaleString()}₫` : 'Check Balance'}
             </Button>
-            <Button variant="outline" onClick={syncProducts}>
-              <RefreshCw className="h-4 w-4 mr-1" />
+            <Button variant="outline" onClick={syncProducts} disabled={syncing}>
+              {syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1" />
+              )}
               Sync Products
             </Button>
           </div>
@@ -329,6 +359,13 @@ export default function Admin() {
                           </td>
                         </tr>
                       ))}
+                      {products.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                            No products yet. Click "Sync Products" to fetch from DongVanFB.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -368,6 +405,13 @@ export default function Admin() {
                           </td>
                         </tr>
                       ))}
+                      {orders.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                            No orders yet.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -401,6 +445,13 @@ export default function Admin() {
                           </td>
                         </tr>
                       ))}
+                      {users.length === 0 && (
+                        <tr>
+                          <td colSpan={3} className="py-8 text-center text-muted-foreground">
+                            No users yet.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

@@ -12,10 +12,8 @@ import {
   Wallet, 
   Loader2, 
   Bitcoin,
-  Copy,
-  CheckCircle,
-  ExternalLink,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 
 export default function Deposit() {
@@ -24,12 +22,7 @@ export default function Deposit() {
   const { toast } = useToast();
   const [amount, setAmount] = useState('10');
   const [loading, setLoading] = useState(false);
-  const [paymentData, setPaymentData] = useState<{
-    payment_id: string;
-    pay_address: string;
-    pay_amount: number;
-    pay_currency: string;
-  } | null>(null);
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -50,18 +43,20 @@ export default function Deposit() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-payment', {
-        body: { amount: numAmount, user_id: user!.id }
+      const { data, error } = await supabase.functions.invoke('nowpayments-create', {
+        body: { amount: numAmount, currency: 'usd' }
       });
 
       if (error) throw error;
 
-      if (data.payment_id) {
-        setPaymentData(data);
+      if (data.success && data.invoice_url) {
+        setInvoiceUrl(data.invoice_url);
         toast({
           title: 'Payment Created',
-          description: 'Send crypto to the address shown below.',
+          description: 'Click the button below to complete your payment.',
         });
+      } else {
+        throw new Error(data.error || 'Failed to create payment');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
@@ -75,13 +70,9 @@ export default function Deposit() {
     }
   };
 
-  const copyAddress = () => {
-    if (paymentData?.pay_address) {
-      navigator.clipboard.writeText(paymentData.pay_address);
-      toast({
-        title: 'Copied!',
-        description: 'Payment address copied to clipboard.',
-      });
+  const openPaymentPage = () => {
+    if (invoiceUrl) {
+      window.open(invoiceUrl, '_blank');
     }
   };
 
@@ -118,7 +109,7 @@ export default function Deposit() {
           </CardContent>
         </Card>
 
-        {!paymentData ? (
+        {!invoiceUrl ? (
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -188,47 +179,34 @@ export default function Deposit() {
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-success">
-                <CheckCircle className="h-5 w-5" />
-                Payment Created
+                <Bitcoin className="h-5 w-5" />
+                Payment Ready
               </CardTitle>
               <CardDescription>
-                Send exactly the amount shown below to complete your deposit
+                Click the button below to open the payment page and complete your deposit.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-4 rounded-lg bg-secondary/50 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Amount to Send</span>
-                  <span className="font-bold text-lg">
-                    {paymentData.pay_amount} {paymentData.pay_currency.toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">USD Value</span>
-                  <span className="font-medium">${amount}</span>
-                </div>
+              <div className="p-4 rounded-lg bg-secondary/50 text-center">
+                <p className="text-2xl font-bold text-primary">${amount}</p>
+                <p className="text-sm text-muted-foreground">Amount to deposit</p>
               </div>
 
-              <div className="space-y-2">
-                <Label>Payment Address</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={paymentData.pay_address}
-                    readOnly
-                    className="font-mono text-xs bg-secondary/50"
-                  />
-                  <Button variant="outline" size="icon" onClick={copyAddress}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+              <Button 
+                variant="glow" 
+                className="w-full"
+                onClick={openPaymentPage}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open Payment Page
+              </Button>
 
               <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
                 <AlertCircle className="h-4 w-4 text-primary mt-0.5" />
                 <div className="text-xs text-muted-foreground space-y-1">
-                  <p>• Send exactly {paymentData.pay_amount} {paymentData.pay_currency.toUpperCase()}</p>
+                  <p>• Complete payment on the NOWPayments page</p>
                   <p>• Your balance will update automatically after confirmation</p>
-                  <p>• Payment ID: {paymentData.payment_id}</p>
+                  <p>• This may take a few minutes depending on network congestion</p>
                 </div>
               </div>
 
@@ -236,14 +214,17 @@ export default function Deposit() {
                 <Button 
                   variant="outline" 
                   className="flex-1"
-                  onClick={() => setPaymentData(null)}
+                  onClick={() => setInvoiceUrl(null)}
                 >
                   New Payment
                 </Button>
                 <Button 
-                  variant="glow" 
+                  variant="outline" 
                   className="flex-1"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => {
+                    refreshProfile();
+                    navigate('/dashboard');
+                  }}
                 >
                   Go to Dashboard
                 </Button>

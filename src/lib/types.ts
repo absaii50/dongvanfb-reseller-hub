@@ -80,12 +80,13 @@ export interface DongVanBuyResponse {
 }
 
 export interface MailMessage {
-  uid: number;
-  date: string;
-  from: { name: string; address: string }[];
-  subject: string;
-  code: string;
-  message: string;
+  uid?: number;
+  date?: string;
+  from?: string;
+  subject?: string;
+  code?: string;
+  message?: string;
+  body?: string;
 }
 
 export interface NOWPaymentInvoice {

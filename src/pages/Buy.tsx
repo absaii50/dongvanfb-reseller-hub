@@ -76,11 +76,12 @@ export default function Buy() {
 
     setPurchasing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('buy-mail', {
+      const { data, error } = await supabase.functions.invoke('dongvan-api', {
         body: { 
+          action: 'buy_mail',
           product_id: product.id,
           quantity,
-          user_id: user.id
+          total_price: totalPrice
         }
       });
 
