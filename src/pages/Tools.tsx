@@ -295,24 +295,54 @@ export default function Tools() {
 
                   {messages.length > 0 && (
                     <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                      {messages.map((msg, i) => (
-                        <div key={i} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <p className="font-medium">{msg.subject || 'No Subject'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                From: {typeof msg.from === 'string' ? msg.from : 'Unknown'}
-                              </p>
+                      {messages.map((msg, i) => {
+                        // Handle 'from' which can be string or array of objects
+                        const fromDisplay = typeof msg.from === 'string' 
+                          ? msg.from 
+                          : Array.isArray(msg.from) && msg.from[0]
+                            ? (msg.from[0] as { name?: string; address?: string }).name || (msg.from[0] as { address?: string }).address || 'Unknown'
+                            : 'Unknown';
+                        
+                        // Handle date - could be ISO string or invalid
+                        const dateDisplay = msg.date ? (() => {
+                          try {
+                            const d = new Date(msg.date);
+                            return isNaN(d.getTime()) ? '' : d.toLocaleString();
+                          } catch {
+                            return '';
+                          }
+                        })() : '';
+                        
+                        // Strip HTML from body for clean display
+                        const bodyText = (msg.body || msg.message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                        
+                        return (
+                          <div key={i} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium truncate">{msg.subject || 'No Subject'}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  From: {fromDisplay}
+                                </p>
+                              </div>
+                              {dateDisplay && (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">
+                                  {dateDisplay}
+                                </span>
+                              )}
                             </div>
-                            <span className="text-xs text-muted-foreground">
-                              {msg.date ? new Date(msg.date).toLocaleString() : ''}
-                            </span>
+                            {msg.code && (
+                              <div className="mb-2 p-2 bg-success/10 border border-success/20 rounded">
+                                <span className="text-xs text-muted-foreground">Code: </span>
+                                <span className="font-bold text-success">{msg.code}</span>
+                              </div>
+                            )}
+                            {bodyText && (
+                              <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{bodyText.slice(0, 300)}{bodyText.length > 300 ? '...' : ''}</p>
+                            )}
                           </div>
-                          {(msg.body || msg.message) && (
-                            <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{msg.body || msg.message}</p>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </TabsContent>
