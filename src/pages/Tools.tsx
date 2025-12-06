@@ -15,7 +15,8 @@ import {
   Search,
   Code,
   Inbox,
-  RefreshCw
+  RefreshCw,
+  Copy
 } from 'lucide-react';
 
 export default function Tools() {
@@ -24,19 +25,18 @@ export default function Tools() {
   
   // Read Mailbox state
   const [email, setEmail] = useState('');
-  const [refreshToken, setRefreshToken] = useState('');
-  const [clientId, setClientId] = useState('');
+  const [password, setPassword] = useState('');
   const [messages, setMessages] = useState<MailMessage[]>([]);
   
   // Get Code state
-  const [codeType, setCodeType] = useState('facebook');
-  const [codeResult, setCodeResult] = useState<{ code: string; content: string } | null>(null);
+  const [sender, setSender] = useState('');
+  const [codeResult, setCodeResult] = useState<{ code: string; message?: string } | null>(null);
 
   const handleReadMailbox = async () => {
-    if (!email || !refreshToken || !clientId) {
+    if (!email || !password) {
       toast({
         title: 'Missing Fields',
-        description: 'Please fill in all required fields.',
+        description: 'Please enter email and password.',
         variant: 'destructive',
       });
       return;
@@ -45,20 +45,20 @@ export default function Tools() {
     setLoading(true);
     setMessages([]);
     try {
-      const { data, error } = await supabase.functions.invoke('read-mailbox', {
-        body: { email, refresh_token: refreshToken, client_id: clientId }
+      const { data, error } = await supabase.functions.invoke('dongvan-api', {
+        body: { action: 'read_mailbox', email, password }
       });
 
       if (error) throw error;
 
-      if (data.status && data.messages) {
-        setMessages(data.messages);
+      if (data.success && data.data) {
+        setMessages(data.data);
         toast({
           title: 'Success',
-          description: `Found ${data.messages.length} messages.`,
+          description: `Found ${data.data.length} messages.`,
         });
       } else {
-        throw new Error(data.error || 'Failed to read mailbox');
+        throw new Error(data.message || data.error || 'Failed to read mailbox');
       }
     } catch (error: any) {
       console.error('Read mailbox error:', error);
@@ -73,10 +73,10 @@ export default function Tools() {
   };
 
   const handleGetCode = async () => {
-    if (!email || !refreshToken || !clientId) {
+    if (!email || !password) {
       toast({
         title: 'Missing Fields',
-        description: 'Please fill in all required fields.',
+        description: 'Please enter email and password.',
         variant: 'destructive',
       });
       return;
@@ -85,27 +85,27 @@ export default function Tools() {
     setLoading(true);
     setCodeResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('get-code', {
+      const { data, error } = await supabase.functions.invoke('dongvan-api', {
         body: { 
+          action: 'get_code',
           email, 
-          refresh_token: refreshToken, 
-          client_id: clientId,
-          type: codeType
+          password,
+          sender: sender || undefined
         }
       });
 
       if (error) throw error;
 
-      if (data.status && data.code) {
-        setCodeResult({ code: data.code, content: data.content || '' });
+      if (data.success && data.data) {
+        setCodeResult({ code: data.data.code || data.data, message: data.message });
         toast({
           title: 'Code Found!',
-          description: `Verification code: ${data.code}`,
+          description: `Verification code: ${data.data.code || data.data}`,
         });
       } else {
         toast({
           title: 'No Code Found',
-          description: 'No verification code found in recent emails.',
+          description: data.message || 'No verification code found in recent emails.',
           variant: 'destructive',
         });
       }
@@ -122,12 +122,11 @@ export default function Tools() {
   };
 
   const parseMailCredentials = (input: string) => {
-    // Format: email|password|refresh_token|client_id
+    // Format: email|password or email|password|...
     const parts = input.split('|');
-    if (parts.length >= 4) {
+    if (parts.length >= 2) {
       setEmail(parts[0]);
-      setRefreshToken(parts[2]);
-      setClientId(parts[3]);
+      setPassword(parts[1]);
       toast({
         title: 'Parsed!',
         description: 'Credentials have been filled in.',
@@ -135,8 +134,18 @@ export default function Tools() {
     } else {
       toast({
         title: 'Invalid Format',
-        description: 'Please use format: email|password|refresh_token|client_id',
+        description: 'Please use format: email|password',
         variant: 'destructive',
+      });
+    }
+  };
+
+  const copyCode = () => {
+    if (codeResult?.code) {
+      navigator.clipboard.writeText(codeResult.code);
+      toast({
+        title: 'Copied!',
+        description: 'Code copied to clipboard.',
       });
     }
   };
@@ -146,7 +155,7 @@ export default function Tools() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Mail Tools</h1>
-          <p className="text-muted-foreground">Read mailbox and get verification codes using OAuth2</p>
+          <p className="text-muted-foreground">Read mailbox and get verification codes</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -158,14 +167,14 @@ export default function Tools() {
                 Mail Credentials
               </CardTitle>
               <CardDescription>
-                Enter your OAuth2 credentials or paste the full format
+                Enter your mail credentials or paste the full format
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Quick Parse</Label>
                 <Textarea
-                  placeholder="Paste: email|password|refresh_token|client_id"
+                  placeholder="Paste: email|password"
                   className="bg-secondary/50 border-border/50 h-20"
                   onChange={(e) => {
                     if (e.target.value.includes('|')) {
@@ -196,22 +205,13 @@ export default function Tools() {
               </div>
 
               <div className="space-y-2">
-                <Label>Refresh Token</Label>
-                <Textarea
-                  value={refreshToken}
-                  onChange={(e) => setRefreshToken(e.target.value)}
-                  placeholder="M.C556_SN1.0.U.-..."
-                  className="bg-secondary/50 border-border/50 h-20 font-mono text-xs"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Client ID</Label>
+                <Label>Password</Label>
                 <Input
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  className="bg-secondary/50 border-border/50 font-mono text-xs"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="bg-secondary/50 border-border/50"
                 />
               </div>
             </CardContent>
@@ -256,20 +256,17 @@ export default function Tools() {
                         <div key={i} className="p-4 rounded-lg bg-secondary/30 border border-border/30">
                           <div className="flex items-start justify-between mb-2">
                             <div>
-                              <p className="font-medium">{msg.subject}</p>
+                              <p className="font-medium">{msg.subject || 'No Subject'}</p>
                               <p className="text-xs text-muted-foreground">
-                                From: {msg.from?.[0]?.name || msg.from?.[0]?.address || 'Unknown'}
+                                From: {typeof msg.from === 'string' ? msg.from : 'Unknown'}
                               </p>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                              {new Date(msg.date).toLocaleString()}
+                              {msg.date ? new Date(msg.date).toLocaleString() : ''}
                             </span>
                           </div>
-                          {msg.code && (
-                            <div className="mt-2 p-2 rounded bg-primary/10 border border-primary/20">
-                              <span className="text-xs text-muted-foreground">Code: </span>
-                              <span className="font-bold text-primary">{msg.code}</span>
-                            </div>
+                          {(msg.body || msg.message) && (
+                            <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{msg.body || msg.message}</p>
                           )}
                         </div>
                       ))}
@@ -279,19 +276,16 @@ export default function Tools() {
 
                 <TabsContent value="code" className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Code Type</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {['facebook', 'instagram', 'twitter', 'google', 'telegram', 'tiktok', 'all'].map((type) => (
-                        <Button
-                          key={type}
-                          variant={codeType === type ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setCodeType(type)}
-                        >
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </Button>
-                      ))}
-                    </div>
+                    <Label>Sender Filter (Optional)</Label>
+                    <Input
+                      value={sender}
+                      onChange={(e) => setSender(e.target.value)}
+                      placeholder="facebook, instagram, google..."
+                      className="bg-secondary/50 border-border/50"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Filter codes by sender name (e.g., facebook, instagram, tiktok)
+                    </p>
                   </div>
 
                   <Button 
@@ -305,7 +299,7 @@ export default function Tools() {
                     ) : (
                       <>
                         <RefreshCw className="h-4 w-4" />
-                        Get {codeType.charAt(0).toUpperCase() + codeType.slice(1)} Code
+                        Get Verification Code
                       </>
                     )}
                   </Button>
@@ -313,9 +307,14 @@ export default function Tools() {
                   {codeResult && (
                     <div className="p-4 rounded-lg bg-success/10 border border-success/20">
                       <p className="text-sm text-muted-foreground mb-2">Verification Code Found:</p>
-                      <p className="text-3xl font-bold text-success text-center">{codeResult.code}</p>
-                      {codeResult.content && (
-                        <p className="text-xs text-muted-foreground mt-2 text-center">{codeResult.content}</p>
+                      <div className="flex items-center justify-center gap-3">
+                        <p className="text-3xl font-bold text-success">{codeResult.code}</p>
+                        <Button variant="ghost" size="icon" onClick={copyCode}>
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {codeResult.message && (
+                        <p className="text-xs text-muted-foreground mt-2 text-center">{codeResult.message}</p>
                       )}
                     </div>
                   )}
