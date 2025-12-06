@@ -65,17 +65,35 @@ serve(async (req) => {
     console.log('Starting product sync...');
     
     // Fetch products from DongVanFB
-    const response = await fetch(`${DONGVAN_API_BASE}/api/products?apikey=${apiKey}`);
-    const data = await response.json();
+    const apiUrl = `${DONGVAN_API_BASE}/api/products?apikey=${apiKey}`;
+    console.log('Fetching from:', apiUrl.replace(apiKey!, '***API_KEY***'));
     
-    if (!data.success || !Array.isArray(data.data)) {
-      throw new Error('Failed to fetch products from DongVanFB');
+    const response = await fetch(apiUrl);
+    const responseText = await response.text();
+    
+    console.log('DongVanFB API response status:', response.status);
+    console.log('DongVanFB API response:', responseText.substring(0, 500));
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse API response:', e);
+      throw new Error(`Failed to parse DongVanFB response: ${responseText.substring(0, 200)}`);
     }
     
-    console.log(`Fetched ${data.data.length} products from DongVanFB`);
+    // Handle different API response formats
+    const products = data.data || data.products || data;
+    
+    if (!Array.isArray(products)) {
+      console.error('Invalid API response structure:', JSON.stringify(data).substring(0, 500));
+      throw new Error(`Invalid API response format. Expected array of products.`);
+    }
+    
+    console.log(`Fetched ${products.length} products from DongVanFB`);
     
     // Filter to allowed products
-    const allowedProducts = data.data.filter((p: { id: number }) => 
+    const allowedProducts = products.filter((p: { id: number }) =>
       ALLOWED_PRODUCT_IDS.includes(p.id)
     );
     
