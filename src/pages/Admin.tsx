@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Product, Order, Profile } from '@/lib/types';
+import { Product, Order, Profile, Deposit } from '@/lib/types';
 import { 
   Loader2, 
   Package,
@@ -25,7 +25,14 @@ import {
   Trash2,
   CheckCircle,
   Clock,
-  XCircle
+  XCircle,
+  CreditCard,
+  Download,
+  Search,
+  TrendingUp,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react';
 import {
   Dialog,
@@ -34,6 +41,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function Admin() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -45,7 +59,13 @@ export default function Admin() {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [apiBalance, setApiBalance] = useState<number | null>(null);
+  
+  // Search & Filter
+  const [userSearch, setUserSearch] = useState('');
+  const [userBalanceFilter, setUserBalanceFilter] = useState<string>('all');
+  const [depositStatusFilter, setDepositStatusFilter] = useState<string>('all');
   
   // Product editing
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -81,21 +101,70 @@ export default function Admin() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, ordersRes, usersRes] = await Promise.all([
+      const [productsRes, ordersRes, usersRes, depositsRes] = await Promise.all([
         supabase.from('products').select('*').order('created_at', { ascending: false }),
-        supabase.from('orders').select('*, product:products(*)').order('created_at', { ascending: false }).limit(50),
+        supabase.from('orders').select('*, product:products(*)').order('created_at', { ascending: false }).limit(100),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+        supabase.from('deposits').select('*').order('created_at', { ascending: false }).limit(100),
       ]);
 
       if (productsRes.data) setProducts(productsRes.data.map(p => ({ ...p, price: Number(p.price) })));
       if (ordersRes.data) setOrders(ordersRes.data.map(o => ({ ...o, total_price: Number(o.total_price) })));
       if (usersRes.data) setUsers(usersRes.data.map(u => ({ ...u, balance: Number(u.balance) })));
+      if (depositsRes.data) setDeposits(depositsRes.data.map(d => ({ ...d, amount: Number(d.amount) })));
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Filtered users
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const matchesSearch = u.email.toLowerCase().includes(userSearch.toLowerCase());
+      const matchesBalance = userBalanceFilter === 'all' || 
+        (userBalanceFilter === 'zero' && u.balance === 0) ||
+        (userBalanceFilter === 'positive' && u.balance > 0) ||
+        (userBalanceFilter === 'high' && u.balance >= 50);
+      return matchesSearch && matchesBalance;
+    });
+  }, [users, userSearch, userBalanceFilter]);
+
+  // Filtered deposits
+  const filteredDeposits = useMemo(() => {
+    return deposits.filter(d => 
+      depositStatusFilter === 'all' || d.payment_status === depositStatusFilter
+    );
+  }, [deposits, depositStatusFilter]);
+
+  // Analytics calculations
+  const analytics = useMemo(() => {
+    const today = new Date();
+    const last7Days = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    const ordersLast7Days = orders.filter(o => new Date(o.created_at) >= last7Days);
+    const ordersLast30Days = orders.filter(o => new Date(o.created_at) >= last30Days);
+    const usersLast7Days = users.filter(u => new Date(u.created_at) >= last7Days);
+    
+    const revenue7Days = ordersLast7Days.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total_price, 0);
+    const revenue30Days = ordersLast30Days.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total_price, 0);
+    const totalRevenue = orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total_price, 0);
+    const totalDeposits = deposits.filter(d => d.payment_status === 'finished').reduce((sum, d) => sum + d.amount, 0);
+    const pendingDeposits = deposits.filter(d => d.payment_status === 'waiting').reduce((sum, d) => sum + d.amount, 0);
+    
+    return {
+      revenue7Days,
+      revenue30Days,
+      totalRevenue,
+      totalDeposits,
+      pendingDeposits,
+      ordersLast7Days: ordersLast7Days.length,
+      newUsersLast7Days: usersLast7Days.length,
+      avgOrderValue: orders.length > 0 ? totalRevenue / orders.filter(o => o.status === 'completed').length : 0,
+    };
+  }, [orders, users, deposits]);
 
   const checkApiBalance = async () => {
     setCheckingBalance(true);
@@ -129,7 +198,7 @@ export default function Admin() {
       if (data.success) {
         toast({ 
           title: 'Success', 
-          description: data.message || `Synced ${data.synced} products (${data.created} new, ${data.updated} updated)` 
+          description: data.message || `Synced ${data.synced} products` 
         });
         fetchData();
       } else {
@@ -154,16 +223,11 @@ export default function Admin() {
       };
 
       if (editingProduct?.id) {
-        const { error } = await supabase
-          .from('products')
-          .update(productData)
-          .eq('id', editingProduct.id);
+        const { error } = await supabase.from('products').update(productData).eq('id', editingProduct.id);
         if (error) throw error;
         toast({ title: 'Success', description: 'Product updated' });
       } else {
-        const { error } = await supabase
-          .from('products')
-          .insert({ ...productData, stock: 0 });
+        const { error } = await supabase.from('products').insert({ ...productData, stock: 0 });
         if (error) throw error;
         toast({ title: 'Success', description: 'Product created' });
       }
@@ -185,11 +249,7 @@ export default function Admin() {
       const newBalance = editingUser.balance + amount;
       if (newBalance < 0) throw new Error('Balance cannot be negative');
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({ balance: newBalance })
-        .eq('id', editingUser.id);
-      
+      const { error } = await supabase.from('profiles').update({ balance: newBalance }).eq('id', editingUser.id);
       if (error) throw error;
       
       toast({ 
@@ -216,13 +276,67 @@ export default function Admin() {
     }
   };
 
+  const updateDepositStatus = async (depositId: string, status: string) => {
+    try {
+      const { error } = await supabase.from('deposits').update({ payment_status: status }).eq('id', depositId);
+      if (error) throw error;
+      
+      // If approved, add balance to user
+      if (status === 'finished') {
+        const deposit = deposits.find(d => d.id === depositId);
+        if (deposit) {
+          const userProfile = users.find(u => u.user_id === deposit.user_id);
+          if (userProfile) {
+            await supabase.from('profiles').update({ 
+              balance: userProfile.balance + deposit.amount 
+            }).eq('user_id', deposit.user_id);
+          }
+        }
+      }
+      
+      toast({ title: 'Success', description: `Deposit ${status}` });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  // Export functions
+  const exportToCSV = (data: any[], filename: string) => {
+    if (data.length === 0) {
+      toast({ title: 'No Data', description: 'Nothing to export', variant: 'destructive' });
+      return;
+    }
+    
+    const headers = Object.keys(data[0]).join(',');
+    const rows = data.map(row => 
+      Object.values(row).map(val => 
+        typeof val === 'object' ? JSON.stringify(val) : `"${val}"`
+      ).join(',')
+    );
+    const csv = [headers, ...rows].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({ title: 'Exported', description: `${filename}.csv downloaded` });
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
+      case 'finished':
         return <Badge className="bg-success/20 text-success"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
       case 'pending':
+      case 'waiting':
         return <Badge className="bg-warning/20 text-warning"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
       case 'failed':
+      case 'expired':
         return <Badge className="bg-destructive/20 text-destructive"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
@@ -245,93 +359,235 @@ export default function Admin() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
-            <p className="text-muted-foreground">Manage products, orders, and users</p>
+            <p className="text-muted-foreground">Manage products, orders, users, and deposits</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={checkApiBalance} disabled={checkingBalance}>
-              {checkingBalance ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <Wallet className="h-4 w-4 mr-1" />
-              )}
+              {checkingBalance ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Wallet className="h-4 w-4 mr-1" />}
               {apiBalance !== null ? `${apiBalance.toLocaleString()}₫` : 'Check Balance'}
             </Button>
             <Button variant="outline" onClick={syncProducts} disabled={syncing}>
-              {syncing ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-1" />
-              )}
+              {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
               Sync Products
             </Button>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        {/* Analytics Cards */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="bg-card/50 border-border/50">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold">{products.length}</p>
-                  <p className="text-xs text-muted-foreground">Products</p>
+                  <p className="text-xs text-muted-foreground">Total Revenue</p>
+                  <p className="text-2xl font-bold text-primary">${analytics.totalRevenue.toFixed(2)}</p>
                 </div>
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-xs">
+                <ArrowUpRight className="h-3 w-3 text-success" />
+                <span className="text-success">${analytics.revenue7Days.toFixed(2)}</span>
+                <span className="text-muted-foreground">last 7 days</span>
               </div>
             </CardContent>
           </Card>
+          
           <Card className="bg-card/50 border-border/50">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Orders</p>
+                  <p className="text-2xl font-bold">{orders.length}</p>
+                </div>
                 <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center">
                   <ShoppingBag className="h-5 w-5 text-success" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{orders.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Orders</p>
-                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-xs">
+                <span className="text-muted-foreground">{analytics.ordersLast7Days} orders last 7 days</span>
               </div>
             </CardContent>
           </Card>
+          
           <Card className="bg-card/50 border-border/50">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Users</p>
+                  <p className="text-2xl font-bold">{users.length}</p>
+                </div>
                 <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center">
                   <Users className="h-5 w-5 text-accent" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold">{users.length}</p>
-                  <p className="text-xs text-muted-foreground">Users</p>
-                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-xs">
+                <ArrowUpRight className="h-3 w-3 text-success" />
+                <span className="text-success">+{analytics.newUsersLast7Days}</span>
+                <span className="text-muted-foreground">new last 7 days</span>
               </div>
             </CardContent>
           </Card>
+          
           <Card className="bg-card/50 border-border/50">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                  <Wallet className="h-5 w-5 text-warning" />
-                </div>
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold">
-                    ${orders.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.total_price, 0).toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Total Revenue</p>
+                  <p className="text-xs text-muted-foreground">Pending Deposits</p>
+                  <p className="text-2xl font-bold text-warning">${analytics.pendingDeposits.toFixed(2)}</p>
                 </div>
+                <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-warning" />
+                </div>
+              </div>
+              <div className="flex items-center gap-1 mt-2 text-xs">
+                <span className="text-muted-foreground">${analytics.totalDeposits.toFixed(2)} total deposited</span>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="products">
-          <TabsList className="mb-4">
+        <Tabs defaultValue="analytics">
+          <TabsList className="mb-4 flex-wrap">
+            <TabsTrigger value="analytics"><BarChart3 className="h-4 w-4 mr-2" />Analytics</TabsTrigger>
+            <TabsTrigger value="deposits"><CreditCard className="h-4 w-4 mr-2" />Deposits</TabsTrigger>
             <TabsTrigger value="products"><Package className="h-4 w-4 mr-2" />Products</TabsTrigger>
             <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Orders</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>
           </TabsList>
 
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card className="bg-card/50 border-border/50">
+                <CardHeader>
+                  <CardTitle>Revenue Summary</CardTitle>
+                  <CardDescription>Financial overview</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Last 7 Days</span>
+                    <span className="font-bold text-primary">${analytics.revenue7Days.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Last 30 Days</span>
+                    <span className="font-bold text-primary">${analytics.revenue30Days.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Total Revenue</span>
+                    <span className="font-bold text-primary">${analytics.totalRevenue.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Avg Order Value</span>
+                    <span className="font-bold">${analytics.avgOrderValue.toFixed(2)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-card/50 border-border/50">
+                <CardHeader>
+                  <CardTitle>Quick Stats</CardTitle>
+                  <CardDescription>Platform metrics</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Products Active</span>
+                    <span className="font-bold">{products.filter(p => p.is_active).length}/{products.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Completed Orders</span>
+                    <span className="font-bold text-success">{orders.filter(o => o.status === 'completed').length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Total User Balance</span>
+                    <span className="font-bold">${users.reduce((sum, u) => sum + u.balance, 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg">
+                    <span className="text-muted-foreground">Pending Deposits</span>
+                    <span className="font-bold text-warning">{deposits.filter(d => d.payment_status === 'waiting').length}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Deposits Tab */}
+          <TabsContent value="deposits">
+            <Card className="bg-card/50 border-border/50">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Deposits</CardTitle>
+                  <CardDescription>Manage crypto deposits</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={depositStatusFilter} onValueChange={setDepositStatusFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Filter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="waiting">Waiting</SelectItem>
+                      <SelectItem value="finished">Finished</SelectItem>
+                      <SelectItem value="expired">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm" onClick={() => exportToCSV(deposits, 'deposits')}>
+                    <Download className="h-4 w-4 mr-1" />Export
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border/50">
+                        <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">User</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Amount</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Currency</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Status</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Date</th>
+                        <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredDeposits.map((deposit) => {
+                        const userProfile = users.find(u => u.user_id === deposit.user_id);
+                        return (
+                          <tr key={deposit.id} className="border-b border-border/30">
+                            <td className="py-3 px-2 text-sm">{userProfile?.email || deposit.user_id.slice(0, 8)}</td>
+                            <td className="py-3 px-2 text-center font-medium text-primary">${deposit.amount.toFixed(2)}</td>
+                            <td className="py-3 px-2 text-center">{deposit.currency}</td>
+                            <td className="py-3 px-2 text-center">{getStatusBadge(deposit.payment_status)}</td>
+                            <td className="py-3 px-2 text-center text-sm text-muted-foreground">
+                              {new Date(deposit.created_at).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-2 text-right">
+                              {deposit.payment_status === 'waiting' && (
+                                <div className="flex gap-1 justify-end">
+                                  <Button size="sm" variant="ghost" className="text-success" onClick={() => updateDepositStatus(deposit.id, 'finished')}>
+                                    <CheckCircle className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => updateDepositStatus(deposit.id, 'expired')}>
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {filteredDeposits.length === 0 && (
+                        <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No deposits found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Products Tab */}
           <TabsContent value="products">
             <Card className="bg-card/50 border-border/50">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -339,13 +595,17 @@ export default function Admin() {
                   <CardTitle>Products</CardTitle>
                   <CardDescription>Manage your mail products and pricing</CardDescription>
                 </div>
-                <Button onClick={() => {
-                  setProductForm({ name: '', description: '', price: '', dongvan_id: '', live_duration: '', is_active: true });
-                  setEditingProduct({} as Product);
-                }}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Product
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => exportToCSV(products, 'products')}>
+                    <Download className="h-4 w-4 mr-1" />Export
+                  </Button>
+                  <Button onClick={() => {
+                    setProductForm({ name: '', description: '', price: '', dongvan_id: '', live_duration: '', is_active: true });
+                    setEditingProduct({} as Product);
+                  }}>
+                    <Plus className="h-4 w-4 mr-1" />Add Product
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -353,8 +613,7 @@ export default function Admin() {
                     <thead>
                       <tr className="border-b border-border/50">
                         <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Name</th>
-                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">DongVan ID</th>
-                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Live</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">ID</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Price</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Stock</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Active</th>
@@ -366,43 +625,25 @@ export default function Admin() {
                         <tr key={product.id} className="border-b border-border/30">
                           <td className="py-3 px-2">{product.name}</td>
                           <td className="py-3 px-2 text-center">{product.dongvan_id}</td>
-                          <td className="py-3 px-2 text-center text-muted-foreground">{product.live_duration || '-'}</td>
                           <td className="py-3 px-2 text-center text-primary font-medium">${product.price.toFixed(2)}</td>
                           <td className="py-3 px-2 text-center">{product.stock}</td>
                           <td className="py-3 px-2 text-center">
-                            <Badge variant={product.is_active ? 'default' : 'secondary'}>
-                              {product.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
+                            <Badge variant={product.is_active ? 'default' : 'secondary'}>{product.is_active ? 'Active' : 'Inactive'}</Badge>
                           </td>
                           <td className="py-3 px-2 text-right">
-                            <div className="flex gap-2 justify-end">
+                            <div className="flex gap-1 justify-end">
                               <Button variant="ghost" size="sm" onClick={() => {
                                 setEditingProduct(product);
                                 setProductForm({
-                                  name: product.name,
-                                  description: product.description || '',
-                                  price: product.price.toString(),
-                                  dongvan_id: product.dongvan_id.toString(),
-                                  live_duration: product.live_duration || '',
-                                  is_active: product.is_active
+                                  name: product.name, description: product.description || '', price: product.price.toString(),
+                                  dongvan_id: product.dongvan_id.toString(), live_duration: product.live_duration || '', is_active: product.is_active
                                 });
-                              }}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                              }}><Edit className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                             </div>
                           </td>
                         </tr>
                       ))}
-                      {products.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                            No products yet. Click "Sync Products" to fetch from DongVanFB.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -410,11 +651,14 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
+          {/* Orders Tab */}
           <TabsContent value="orders">
             <Card className="bg-card/50 border-border/50">
-              <CardHeader>
-                <CardTitle>Recent Orders</CardTitle>
-                <CardDescription>View and manage customer orders</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div><CardTitle>Orders</CardTitle><CardDescription>View all orders</CardDescription></div>
+                <Button variant="outline" size="sm" onClick={() => exportToCSV(orders.map(o => ({
+                  id: o.id, product: o.product?.name, quantity: o.quantity, total: o.total_price, status: o.status, date: o.created_at
+                })), 'orders')}><Download className="h-4 w-4 mr-1" />Export</Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -437,18 +681,9 @@ export default function Admin() {
                           <td className="py-3 px-2 text-center">{order.quantity}</td>
                           <td className="py-3 px-2 text-center text-primary font-medium">${order.total_price.toFixed(2)}</td>
                           <td className="py-3 px-2 text-center">{getStatusBadge(order.status)}</td>
-                          <td className="py-3 px-2 text-center text-sm text-muted-foreground">
-                            {new Date(order.created_at).toLocaleString()}
-                          </td>
+                          <td className="py-3 px-2 text-center text-sm text-muted-foreground">{new Date(order.created_at).toLocaleString()}</td>
                         </tr>
                       ))}
-                      {orders.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                            No orders yet.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -456,11 +691,34 @@ export default function Admin() {
             </Card>
           </TabsContent>
 
+          {/* Users Tab */}
           <TabsContent value="users">
             <Card className="bg-card/50 border-border/50">
-              <CardHeader>
-                <CardTitle>Users</CardTitle>
-                <CardDescription>Manage user accounts and balances</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div><CardTitle>Users</CardTitle><CardDescription>Manage user accounts</CardDescription></div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      placeholder="Search email..." 
+                      value={userSearch} 
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      className="pl-9 w-48"
+                    />
+                  </div>
+                  <Select value={userBalanceFilter} onValueChange={setUserBalanceFilter}>
+                    <SelectTrigger className="w-32"><SelectValue placeholder="Balance" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="zero">$0 Balance</SelectItem>
+                      <SelectItem value="positive">Has Balance</SelectItem>
+                      <SelectItem value="high">$50+ Balance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm" onClick={() => exportToCSV(users.map(u => ({
+                    email: u.email, balance: u.balance, joined: u.created_at
+                  })), 'users')}><Download className="h-4 w-4 mr-1" />Export</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -474,31 +732,18 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((userProfile) => (
+                      {filteredUsers.map((userProfile) => (
                         <tr key={userProfile.id} className="border-b border-border/30">
                           <td className="py-3 px-2">{userProfile.email}</td>
                           <td className="py-3 px-2 text-center text-primary font-medium">${userProfile.balance.toFixed(2)}</td>
-                          <td className="py-3 px-2 text-center text-sm text-muted-foreground">
-                            {new Date(userProfile.created_at).toLocaleDateString()}
-                          </td>
+                          <td className="py-3 px-2 text-center text-sm text-muted-foreground">{new Date(userProfile.created_at).toLocaleDateString()}</td>
                           <td className="py-3 px-2 text-right">
-                            <Button variant="ghost" size="sm" onClick={() => {
-                              setEditingUser(userProfile);
-                              setBalanceAmount('');
-                            }}>
-                              <Wallet className="h-4 w-4 mr-1" />
-                              Add Balance
+                            <Button variant="ghost" size="sm" onClick={() => { setEditingUser(userProfile); setBalanceAmount(''); }}>
+                              <Wallet className="h-4 w-4 mr-1" />Balance
                             </Button>
                           </td>
                         </tr>
                       ))}
-                      {users.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                            No users yet.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
@@ -511,69 +756,20 @@ export default function Admin() {
       {/* Edit Product Dialog */}
       <Dialog open={!!editingProduct} onOpenChange={() => setEditingProduct(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingProduct?.id ? 'Edit Product' : 'Add Product'}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingProduct?.id ? 'Edit Product' : 'Add Product'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                value={productForm.name}
-                onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                placeholder="HotMail NEW Graph"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                value={productForm.description}
-                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                placeholder="With OAuth2 support"
-              />
-            </div>
+            <div className="space-y-2"><Label>Name</Label><Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Description</Label><Input value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Price (USD)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={productForm.price}
-                  onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                  placeholder="0.50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>DongVan ID</Label>
-                <Input
-                  type="number"
-                  value={productForm.dongvan_id}
-                  onChange={(e) => setProductForm({ ...productForm, dongvan_id: e.target.value })}
-                  placeholder="1"
-                />
-              </div>
+              <div className="space-y-2"><Label>Price (USD)</Label><Input type="number" step="0.01" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} /></div>
+              <div className="space-y-2"><Label>DongVan ID</Label><Input type="number" value={productForm.dongvan_id} onChange={(e) => setProductForm({ ...productForm, dongvan_id: e.target.value })} /></div>
             </div>
-            <div className="space-y-2">
-              <Label>Live Duration</Label>
-              <Input
-                value={productForm.live_duration}
-                onChange={(e) => setProductForm({ ...productForm, live_duration: e.target.value })}
-                placeholder="e.g., 1-3 Hours, 6-12 Months"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={productForm.is_active}
-                onCheckedChange={(checked) => setProductForm({ ...productForm, is_active: checked })}
-              />
-              <Label>Active</Label>
-            </div>
+            <div className="space-y-2"><Label>Live Duration</Label><Input value={productForm.live_duration} onChange={(e) => setProductForm({ ...productForm, live_duration: e.target.value })} /></div>
+            <div className="flex items-center gap-2"><Switch checked={productForm.is_active} onCheckedChange={(checked) => setProductForm({ ...productForm, is_active: checked })} /><Label>Active</Label></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingProduct(null)}>Cancel</Button>
-            <Button onClick={saveProduct}>
-              <Save className="h-4 w-4 mr-1" />
-              Save
-            </Button>
+            <Button onClick={saveProduct}><Save className="h-4 w-4 mr-1" />Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -581,9 +777,7 @@ export default function Admin() {
       {/* Edit User Balance Dialog */}
       <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Adjust User Balance</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Adjust User Balance</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="p-4 bg-secondary/30 rounded-lg">
               <p className="text-sm text-muted-foreground">User</p>
@@ -592,30 +786,19 @@ export default function Admin() {
               <p className="text-xl font-bold text-primary">${editingUser?.balance.toFixed(2)}</p>
             </div>
             <div className="space-y-2">
-              <Label>Amount to Add/Deduct (use negative for deduction)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={balanceAmount}
-                onChange={(e) => setBalanceAmount(e.target.value)}
-                placeholder="10.00 or -5.00"
-              />
+              <Label>Amount (negative for deduction)</Label>
+              <Input type="number" step="0.01" value={balanceAmount} onChange={(e) => setBalanceAmount(e.target.value)} placeholder="10.00 or -5.00" />
             </div>
             {balanceAmount && !isNaN(parseFloat(balanceAmount)) && (
               <div className="p-3 bg-primary/10 rounded-lg">
                 <p className="text-sm text-muted-foreground">New Balance</p>
-                <p className="text-lg font-bold text-primary">
-                  ${((editingUser?.balance || 0) + parseFloat(balanceAmount)).toFixed(2)}
-                </p>
+                <p className="text-lg font-bold text-primary">${((editingUser?.balance || 0) + parseFloat(balanceAmount)).toFixed(2)}</p>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
-            <Button onClick={updateUserBalance} disabled={!balanceAmount}>
-              <Save className="h-4 w-4 mr-1" />
-              Update Balance
-            </Button>
+            <Button onClick={updateUserBalance} disabled={!balanceAmount}><Save className="h-4 w-4 mr-1" />Update</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
