@@ -17,8 +17,11 @@ import {
   Loader2,
   Plus,
   Mail,
-  Eye
+  Eye,
+  Copy,
+  Check
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -92,12 +95,14 @@ export default function Dashboard() {
     }
   };
 
+  const formatMailData = (mail: MailData) => {
+    return `${mail.email}|${mail.password}${mail.refresh_token ? `|${mail.refresh_token}` : ''}${mail.client_id ? `|${mail.client_id}` : ''}`;
+  };
+
   const downloadMailData = (order: Order) => {
     if (!order.mail_data || !Array.isArray(order.mail_data)) return;
     const mailData = order.mail_data as MailData[];
-    const content = mailData.map(m => 
-      `${m.email}|${m.password}${m.refresh_token ? `|${m.refresh_token}` : ''}${m.client_id ? `|${m.client_id}` : ''}`
-    ).join('\n');
+    const content = mailData.map(formatMailData).join('\n');
     
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -106,6 +111,15 @@ export default function Dashboard() {
     a.download = `order_${order.id.slice(0, 8)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  
+  const copyToClipboard = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    toast.success('Copied to clipboard');
+    setTimeout(() => setCopiedIndex(null), 2000);
   };
 
   if (authLoading || !user) {
@@ -359,30 +373,31 @@ export default function Dashboard() {
                     </Button>
                   </div>
                   <div className="max-h-[300px] overflow-y-auto space-y-2">
-                    {(selectedOrder.mail_data as MailData[]).map((mail, i) => (
-                      <div key={i} className="p-3 rounded-lg bg-secondary/50 font-mono text-xs space-y-1">
-                        <div className="flex gap-2">
-                          <span className="text-muted-foreground w-16">Email:</span>
-                          <span className="text-primary break-all">{mail.email}</span>
+                    {(selectedOrder.mail_data as MailData[]).map((mail, i) => {
+                      const formattedData = formatMailData(mail);
+                      return (
+                        <div 
+                          key={i} 
+                          className="flex items-center gap-2 p-3 rounded-lg bg-secondary/50 group"
+                        >
+                          <code className="flex-1 font-mono text-xs break-all text-foreground">
+                            {formattedData}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 h-8 w-8 p-0"
+                            onClick={() => copyToClipboard(formattedData, i)}
+                          >
+                            {copiedIndex === i ? (
+                              <Check className="h-4 w-4 text-success" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
                         </div>
-                        <div className="flex gap-2">
-                          <span className="text-muted-foreground w-16">Password:</span>
-                          <span className="break-all">{mail.password}</span>
-                        </div>
-                        {mail.refresh_token && (
-                          <div className="flex gap-2">
-                            <span className="text-muted-foreground w-16">Token:</span>
-                            <span className="break-all text-muted-foreground">{mail.refresh_token}</span>
-                          </div>
-                        )}
-                        {mail.client_id && (
-                          <div className="flex gap-2">
-                            <span className="text-muted-foreground w-16">Client ID:</span>
-                            <span className="break-all text-muted-foreground">{mail.client_id}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
