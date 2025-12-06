@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,9 +13,7 @@ import {
   Mail, 
   Loader2, 
   Search,
-  Code,
   Inbox,
-  RefreshCw,
   Copy,
   Eye
 } from 'lucide-react';
@@ -31,11 +28,7 @@ export default function Tools() {
   const [refreshToken, setRefreshToken] = useState('');
   const [clientId, setClientId] = useState('');
   const [messages, setMessages] = useState<MailMessage[]>([]);
-  
-  // Get Code state
-  const [sender, setSender] = useState('');
   const [selectedEmail, setSelectedEmail] = useState<MailMessage | null>(null);
-  const [codeResult, setCodeResult] = useState<{ code: string; message?: string } | null>(null);
 
   const handleReadMailbox = async () => {
     if (!email) {
@@ -92,57 +85,6 @@ export default function Tools() {
     }
   };
 
-  const handleGetCode = async () => {
-    if (!email) {
-      toast({
-        title: 'Missing Fields',
-        description: 'Please enter email address.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-    setCodeResult(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('dongvan-api', {
-        body: { 
-          action: 'get_code',
-          email, 
-          password,
-          sender: sender || undefined,
-          refresh_token: refreshToken || undefined,
-          client_id: clientId || undefined
-        }
-      });
-
-      if (error) throw error;
-
-      if (data.success && data.data) {
-        setCodeResult({ code: data.data.code || data.data, message: data.message });
-        toast({
-          title: 'Code Found!',
-          description: `Verification code: ${data.data.code || data.data}`,
-        });
-      } else {
-        toast({
-          title: 'No Code Found',
-          description: data.message || 'No verification code found in recent emails.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error: any) {
-      console.error('Get code error:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to get code.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const parseMailCredentials = (input: string) => {
     // Format: email|password or email|password|refresh_token|client_id
     const parts = input.split('|');
@@ -164,14 +106,12 @@ export default function Tools() {
     }
   };
 
-  const copyCode = () => {
-    if (codeResult?.code) {
-      navigator.clipboard.writeText(codeResult.code);
-      toast({
-        title: 'Copied!',
-        description: 'Code copied to clipboard.',
-      });
-    }
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast({
+      title: 'Copied!',
+      description: 'Code copied to clipboard.',
+    });
   };
 
   return (
@@ -179,7 +119,7 @@ export default function Tools() {
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Mail Tools</h1>
-          <p className="text-muted-foreground">Read mailbox and get verification codes</p>
+          <p className="text-muted-foreground">Read mailbox messages</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -263,147 +203,107 @@ export default function Tools() {
             </CardContent>
           </Card>
 
-          {/* Tools */}
+          {/* Read Mailbox */}
           <Card className="bg-card/50 border-border/50 lg:col-span-2">
-            <Tabs defaultValue="mailbox">
-              <CardHeader>
-                <TabsList className="w-full">
-                  <TabsTrigger value="mailbox" className="flex-1">
-                    <Inbox className="h-4 w-4 mr-2" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Inbox className="h-5 w-5" />
+                Read Mailbox
+              </CardTitle>
+              <CardDescription>
+                Fetch and view emails from your mailbox
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button 
+                onClick={handleReadMailbox} 
+                disabled={loading}
+                variant="glow"
+                className="w-full"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
                     Read Mailbox
-                  </TabsTrigger>
-                  <TabsTrigger value="code" className="flex-1">
-                    <Code className="h-4 w-4 mr-2" />
-                    Get Code
-                  </TabsTrigger>
-                </TabsList>
-              </CardHeader>
-              <CardContent>
-                <TabsContent value="mailbox" className="space-y-4">
-                  <Button 
-                    onClick={handleReadMailbox} 
-                    disabled={loading}
-                    variant="glow"
-                    className="w-full"
-                  >
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4" />
-                        Read Mailbox
-                      </>
-                    )}
-                  </Button>
+                  </>
+                )}
+              </Button>
 
-                  {messages.length > 0 && (
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto">
-                      {messages.map((msg, i) => {
-                        // Handle 'from' which can be string or array of objects
-                        const fromDisplay = typeof msg.from === 'string' 
-                          ? msg.from 
-                          : Array.isArray(msg.from) && msg.from[0]
-                            ? (msg.from[0] as { name?: string; address?: string }).name || (msg.from[0] as { address?: string }).address || 'Unknown'
-                            : 'Unknown';
-                        
-                        // Handle date - could be ISO string or invalid
-                        const dateDisplay = msg.date ? (() => {
-                          try {
-                            const d = new Date(msg.date);
-                            return isNaN(d.getTime()) ? '' : d.toLocaleString();
-                          } catch {
-                            return '';
-                          }
-                        })() : '';
-                        
-                        // Strip HTML from body for clean display
-                        const bodyText = (msg.body || msg.message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-                        
-                        return (
-                          <div 
-                            key={i} 
-                            className="p-4 rounded-lg bg-secondary/30 border border-border/30 cursor-pointer hover:bg-secondary/50 transition-colors"
-                            onClick={() => setSelectedEmail(msg)}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{msg.subject || 'No Subject'}</p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  From: {fromDisplay}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {dateDisplay && (
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                    {dateDisplay}
-                                  </span>
-                                )}
-                                <Eye className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            </div>
-                            {msg.code && (
-                              <div className="mb-2 p-2 bg-success/10 border border-success/20 rounded">
-                                <span className="text-xs text-muted-foreground">Code: </span>
-                                <span className="font-bold text-success">{msg.code}</span>
-                              </div>
-                            )}
-                            {bodyText && (
-                              <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{bodyText.slice(0, 200)}{bodyText.length > 200 ? '...' : ''}</p>
-                            )}
+              {messages.length > 0 && (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {messages.map((msg, i) => {
+                    // Handle 'from' which can be string or array of objects
+                    const fromDisplay = typeof msg.from === 'string' 
+                      ? msg.from 
+                      : Array.isArray(msg.from) && msg.from[0]
+                        ? (msg.from[0] as { name?: string; address?: string }).name || (msg.from[0] as { address?: string }).address || 'Unknown'
+                        : 'Unknown';
+                    
+                    // Handle date - could be ISO string or invalid
+                    const dateDisplay = msg.date ? (() => {
+                      try {
+                        const d = new Date(msg.date);
+                        return isNaN(d.getTime()) ? '' : d.toLocaleString();
+                      } catch {
+                        return '';
+                      }
+                    })() : '';
+                    
+                    // Strip HTML from body for clean display
+                    const bodyText = (msg.body || msg.message || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    
+                    return (
+                      <div 
+                        key={i} 
+                        className="p-4 rounded-lg bg-secondary/30 border border-border/30 cursor-pointer hover:bg-secondary/50 transition-colors"
+                        onClick={() => setSelectedEmail(msg)}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{msg.subject || 'No Subject'}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              From: {fromDisplay}
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="code" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Sender Filter (Optional)</Label>
-                    <Input
-                      value={sender}
-                      onChange={(e) => setSender(e.target.value)}
-                      placeholder="facebook, instagram, google..."
-                      className="bg-secondary/50 border-border/50"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Filter codes by sender name (e.g., facebook, instagram, tiktok)
-                    </p>
-                  </div>
-
-                  <Button 
-                    onClick={handleGetCode} 
-                    disabled={loading}
-                    variant="glow"
-                    className="w-full"
-                  >
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <RefreshCw className="h-4 w-4" />
-                        Get Verification Code
-                      </>
-                    )}
-                  </Button>
-
-                  {codeResult && (
-                    <div className="p-4 rounded-lg bg-success/10 border border-success/20">
-                      <p className="text-sm text-muted-foreground mb-2">Verification Code Found:</p>
-                      <div className="flex items-center justify-center gap-3">
-                        <p className="text-3xl font-bold text-success">{codeResult.code}</p>
-                        <Button variant="ghost" size="icon" onClick={copyCode}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
+                          <div className="flex items-center gap-2">
+                            {dateDisplay && (
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {dateDisplay}
+                              </span>
+                            )}
+                            <Eye className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                        {msg.code && (
+                          <div 
+                            className="mb-2 p-2 bg-success/10 border border-success/20 rounded flex items-center justify-between"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div>
+                              <span className="text-xs text-muted-foreground">Code: </span>
+                              <span className="font-bold text-success">{msg.code}</span>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7"
+                              onClick={() => copyCode(msg.code!)}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                        {bodyText && (
+                          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">{bodyText.slice(0, 200)}{bodyText.length > 200 ? '...' : ''}</p>
+                        )}
                       </div>
-                      {codeResult.message && (
-                        <p className="text-xs text-muted-foreground mt-2 text-center">{codeResult.message}</p>
-                      )}
-                    </div>
-                  )}
-                </TabsContent>
-              </CardContent>
-            </Tabs>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
           </Card>
         </div>
       </div>
