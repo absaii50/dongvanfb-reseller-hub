@@ -29,6 +29,39 @@ export default function Index() {
 
   useEffect(() => {
     fetchProducts();
+
+    // Subscribe to realtime product updates
+    const channel = supabase
+      .channel('products-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products'
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            setProducts(prev => prev.map(p => 
+              p.id === payload.new.id 
+                ? { ...payload.new as Product, price: Number((payload.new as any).price) }
+                : p
+            ));
+          } else if (payload.eventType === 'INSERT') {
+            const newProduct = payload.new as any;
+            if (newProduct.is_active) {
+              setProducts(prev => [...prev, { ...newProduct, price: Number(newProduct.price) }]);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            setProducts(prev => prev.filter(p => p.id !== (payload.old as any).id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchProducts = async () => {

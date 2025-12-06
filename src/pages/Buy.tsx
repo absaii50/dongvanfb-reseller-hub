@@ -42,6 +42,32 @@ export default function Buy() {
     }
   }, [productId]);
 
+  // Subscribe to realtime updates for this product
+  useEffect(() => {
+    if (!productId) return;
+
+    const channel = supabase
+      .channel(`product-${productId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'products',
+          filter: `id=eq.${productId}`
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          setProduct({ ...updated, price: Number(updated.price) });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [productId]);
+
   const fetchProduct = async () => {
     try {
       const { data, error } = await supabase
