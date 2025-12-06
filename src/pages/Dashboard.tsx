@@ -316,11 +316,11 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
           </DialogHeader>
-          {selectedOrder?.mail_data && (
+          {selectedOrder?.mail_data && Array.isArray(selectedOrder.mail_data) && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  {selectedOrder.mail_data.length} account(s)
+                  {(selectedOrder.mail_data as MailData[]).length} account(s)
                 </p>
                 <Button variant="outline" size="sm" onClick={() => downloadMailData(selectedOrder)}>
                   <Download className="h-4 w-4 mr-1" />
@@ -328,7 +328,7 @@ export default function Dashboard() {
                 </Button>
               </div>
               <div className="max-h-[400px] overflow-y-auto space-y-2">
-                {selectedOrder.mail_data.map((mail, i) => (
+                {(selectedOrder.mail_data as MailData[]).map((mail, i) => (
                   <div key={i} className="p-3 rounded-lg bg-secondary/50 font-mono text-sm">
                     <p className="text-primary">{mail.email}</p>
                     <p className="text-muted-foreground">{mail.password}</p>
