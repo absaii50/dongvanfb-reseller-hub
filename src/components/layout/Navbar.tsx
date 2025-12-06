@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { LogOut, User, Settings, Wallet, ShoppingBag, Mail } from 'lucide-react';
+import { LogOut, User, Settings, Wallet, ShoppingBag, Mail, Shield } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,9 +79,13 @@ export function Navbar() {
                       <Wallet className="mr-2 h-4 w-4" />
                       Deposit Funds
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Account Settings
+                    </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem onClick={() => navigate('/admin')}>
-                        <Settings className="mr-2 h-4 w-4" />
+                        <Shield className="mr-2 h-4 w-4" />
                         Admin Panel
                       </DropdownMenuItem>
                     )}
