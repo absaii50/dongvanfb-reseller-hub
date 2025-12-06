@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DONGVAN_API_BASE = 'https://api.dongvanfb.net';
+const DONGVAN_API_BASE = 'https://api.dongvanfb.net/user';
 const ALLOWED_PRODUCT_IDS = [1, 2, 3, 5, 6, 59, 60];
 
 // Default markup percentage (admin can adjust prices later)
@@ -64,8 +64,8 @@ serve(async (req) => {
     
     console.log('Starting product sync...');
     
-    // Fetch products from DongVanFB
-    const apiUrl = `${DONGVAN_API_BASE}/api/products?apikey=${apiKey}`;
+    // Fetch products from DongVanFB - correct endpoint is /user/account_type
+    const apiUrl = `${DONGVAN_API_BASE}/account_type?apikey=${apiKey}`;
     console.log('Fetching from:', apiUrl.replace(apiKey!, '***API_KEY***'));
     
     const response = await fetch(apiUrl);
