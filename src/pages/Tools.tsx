@@ -26,6 +26,8 @@ export default function Tools() {
   // Read Mailbox state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [refreshToken, setRefreshToken] = useState('');
+  const [clientId, setClientId] = useState('');
   const [messages, setMessages] = useState<MailMessage[]>([]);
   
   // Get Code state
@@ -33,10 +35,19 @@ export default function Tools() {
   const [codeResult, setCodeResult] = useState<{ code: string; message?: string } | null>(null);
 
   const handleReadMailbox = async () => {
-    if (!email || !password) {
+    if (!email) {
       toast({
         title: 'Missing Fields',
-        description: 'Please enter email and password.',
+        description: 'Please enter email address.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!password && !refreshToken) {
+      toast({
+        title: 'Missing Fields',
+        description: 'Please enter password or refresh token.',
         variant: 'destructive',
       });
       return;
@@ -46,7 +57,13 @@ export default function Tools() {
     setMessages([]);
     try {
       const { data, error } = await supabase.functions.invoke('dongvan-api', {
-        body: { action: 'read_mailbox', email, password }
+        body: { 
+          action: 'read_mailbox', 
+          email, 
+          password,
+          refresh_token: refreshToken || undefined,
+          client_id: clientId || undefined
+        }
       });
 
       if (error) throw error;
@@ -73,10 +90,10 @@ export default function Tools() {
   };
 
   const handleGetCode = async () => {
-    if (!email || !password) {
+    if (!email) {
       toast({
         title: 'Missing Fields',
-        description: 'Please enter email and password.',
+        description: 'Please enter email address.',
         variant: 'destructive',
       });
       return;
@@ -90,7 +107,9 @@ export default function Tools() {
           action: 'get_code',
           email, 
           password,
-          sender: sender || undefined
+          sender: sender || undefined,
+          refresh_token: refreshToken || undefined,
+          client_id: clientId || undefined
         }
       });
 
@@ -122,19 +141,21 @@ export default function Tools() {
   };
 
   const parseMailCredentials = (input: string) => {
-    // Format: email|password or email|password|...
+    // Format: email|password or email|password|refresh_token|client_id
     const parts = input.split('|');
     if (parts.length >= 2) {
-      setEmail(parts[0]);
-      setPassword(parts[1]);
+      setEmail(parts[0]?.trim() || '');
+      setPassword(parts[1]?.trim() || '');
+      setRefreshToken(parts[2]?.trim() || '');
+      setClientId(parts[3]?.trim() || '');
       toast({
         title: 'Parsed!',
-        description: 'Credentials have been filled in.',
+        description: `Credentials filled. ${parts.length >= 4 ? 'OAuth2 tokens detected.' : 'Password-based auth.'}`,
       });
     } else {
       toast({
         title: 'Invalid Format',
-        description: 'Please use format: email|password',
+        description: 'Please use format: email|password or email|password|refresh_token|client_id',
         variant: 'destructive',
       });
     }
@@ -172,9 +193,9 @@ export default function Tools() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Quick Parse</Label>
+                <Label>Quick Parse (Recommended)</Label>
                 <Textarea
-                  placeholder="Paste: email|password"
+                  placeholder="Paste full format: email|password|refresh_token|client_id"
                   className="bg-secondary/50 border-border/50 h-20"
                   onChange={(e) => {
                     if (e.target.value.includes('|')) {
@@ -183,6 +204,9 @@ export default function Tools() {
                     }
                   }}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Paste mail data directly from your order to auto-fill all fields
+                </p>
               </div>
 
               <div className="relative">
@@ -205,15 +229,34 @@ export default function Tools() {
               </div>
 
               <div className="space-y-2">
-                <Label>Password</Label>
+                <Label>Password / Refresh Token</Label>
                 <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  value={password || refreshToken}
+                  onChange={(e) => {
+                    // If it looks like a token (long string), set as refresh token
+                    if (e.target.value.length > 50) {
+                      setRefreshToken(e.target.value);
+                      setPassword('');
+                    } else {
+                      setPassword(e.target.value);
+                    }
+                  }}
+                  placeholder="Password or OAuth2 refresh token"
                   className="bg-secondary/50 border-border/50"
                 />
               </div>
+
+              {refreshToken && (
+                <div className="space-y-2">
+                  <Label>Client ID (for OAuth2)</Label>
+                  <Input
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    placeholder="OAuth2 Client ID"
+                    className="bg-secondary/50 border-border/50"
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 
