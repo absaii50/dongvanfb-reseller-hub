@@ -29,7 +29,7 @@ export default function Index() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { liveStock, isChecking, lastChecked } = useLiveStock(10000); // Check every 10 seconds
+  const { liveStock, isChecking, isInitialLoading, lastChecked } = useLiveStock(10000); // Check every 10 seconds
 
   // Merge live stock with products
   const productsWithLiveStock = useMemo(() => {
@@ -248,7 +248,12 @@ export default function Index() {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        {product.stock > 0 ? (
+                        {isInitialLoading ? (
+                          <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Checking
+                          </Badge>
+                        ) : product.stock > 0 ? (
                           <Badge variant="outline" className="border-success/30 text-success">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Live
@@ -264,18 +269,22 @@ export default function Index() {
                         <span className="text-primary font-bold">${product.price.toFixed(2)}</span>
                       </td>
                       <td className="py-4 px-4 text-center">
-                        <span className={product.stock > 0 ? 'text-success' : 'text-muted-foreground'}>
-                          {product.stock.toLocaleString()}
-                        </span>
+                        {isInitialLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto text-muted-foreground" />
+                        ) : (
+                          <span className={product.stock > 0 ? 'text-success' : 'text-muted-foreground'}>
+                            {product.stock.toLocaleString()}
+                          </span>
+                        )}
                       </td>
                       <td className="py-4 px-4 text-right">
                         <Button
-                          variant={product.stock > 0 ? 'glow' : 'outline'}
+                          variant={!isInitialLoading && product.stock > 0 ? 'glow' : 'outline'}
                           size="sm"
                           onClick={() => handleBuy(product)}
-                          disabled={product.stock === 0}
+                          disabled={isInitialLoading || product.stock === 0}
                         >
-                          {product.stock > 0 ? 'Buy Now' : 'Notify Me'}
+                          {isInitialLoading ? 'Loading...' : product.stock > 0 ? 'Buy Now' : 'Notify Me'}
                         </Button>
                       </td>
                     </tr>
