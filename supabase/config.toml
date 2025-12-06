@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.sync-products]
 verify_jwt = true
+
+[functions.expire-deposits]
+verify_jwt = false

@@ -106,6 +106,15 @@ serve(async (req) => {
       console.error('Error updating deposit:', updateDepositError);
     }
     
+    // Check if deposit is already expired (don't process expired payments)
+    if (deposit.payment_status === 'expired') {
+      console.log(`Deposit ${deposit.id} is already expired, ignoring payment update`);
+      return new Response(JSON.stringify({ success: true, message: 'Deposit expired' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     // If payment is finished/confirmed, update user balance
     if (payment_status === 'finished' || payment_status === 'confirmed') {
       const amountToAdd = actually_paid || pay_amount || deposit.amount;

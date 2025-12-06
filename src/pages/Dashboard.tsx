@@ -53,6 +53,45 @@ export default function Dashboard() {
     }
   }, [user]);
 
+  // Realtime subscription for deposits
+  useEffect(() => {
+    if (!user) return;
+    
+    const channel = supabase
+      .channel('deposits-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deposits',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('Deposit change:', payload);
+          if (payload.eventType === 'INSERT') {
+            const newDeposit = { ...payload.new, amount: Number(payload.new.amount) } as Deposit;
+            setDeposits(prev => [newDeposit, ...prev].slice(0, 10));
+          } else if (payload.eventType === 'UPDATE') {
+            setDeposits(prev => prev.map(d => 
+              d.id === payload.new.id 
+                ? { ...payload.new, amount: Number(payload.new.amount) } as Deposit
+                : d
+            ));
+            // Refresh profile if payment is confirmed
+            if (payload.new.payment_status === 'finished' || payload.new.payment_status === 'confirmed') {
+              refreshProfile();
+            }
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, refreshProfile]);
+
   const fetchData = async () => {
     try {
       const [ordersRes, depositsRes] = await Promise.all([
@@ -89,9 +128,14 @@ export default function Dashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-success/20 text-success border-success/30"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+      case 'finished':
+      case 'confirmed':
+        return <Badge className="bg-success/20 text-success border-success/30"><CheckCircle className="h-3 w-3 mr-1" />Confirmed</Badge>;
       case 'pending':
-        return <Badge className="bg-warning/20 text-warning border-warning/30"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'waiting':
+        return <Badge className="bg-warning/20 text-warning border-warning/30"><Clock className="h-3 w-3 mr-1" />Waiting</Badge>;
+      case 'expired':
+        return <Badge className="bg-muted/50 text-muted-foreground border-muted/30"><XCircle className="h-3 w-3 mr-1" />Expired</Badge>;
       case 'failed':
         return <Badge className="bg-destructive/20 text-destructive border-destructive/30"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>;
       default:
