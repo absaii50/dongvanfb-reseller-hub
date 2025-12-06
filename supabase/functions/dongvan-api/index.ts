@@ -191,59 +191,67 @@ serve(async (req) => {
       case 'read_mailbox': {
         const { email, password, refresh_token, client_id } = params;
         
-        // For Graph API mails, use OAuth2 endpoint
-        if (refresh_token && client_id) {
-          const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email,
-              refresh_token,
-              client_id,
-              type: 'all'
-            })
-          });
-          const data = await response.json();
-          console.log('DongVan mailbox (OAuth2) response:', data);
-          
-          return new Response(JSON.stringify({
-            success: data.status,
-            data: data.messages || [],
-            message: data.message
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-        
-        // For IMAP mails, use password-based endpoint
-        if (!email || !password) {
-          return new Response(JSON.stringify({ error: 'Email and password/token required' }), {
+        if (!email) {
+          return new Response(JSON.stringify({ error: 'Email required' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
         
-        // Try the Graph API endpoint with password as refresh_token
-        const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/graph_code`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email,
-            refresh_token: password,
-            client_id: params.client_id || '',
-            type: 'all'
-          })
-        });
-        const data = await response.json();
+        // For Graph API mails with OAuth2 tokens - use graph_messages endpoint
+        if (refresh_token && client_id) {
+          console.log('Using OAuth2 Graph API for reading messages...');
+          const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/graph_messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              refresh_token,
+              client_id
+            })
+          });
+          const data = await response.json();
+          console.log('DongVan graph_messages response:', JSON.stringify(data).slice(0, 500));
+          
+          return new Response(JSON.stringify({
+            success: data.status === true,
+            data: data.messages || [],
+            message: data.status ? 'Messages retrieved successfully' : (data.message || 'Failed to read mailbox')
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         
-        console.log('DongVan mailbox response:', data);
+        // For IMAP/password-based mails - try get_code_oauth2 with type=all
+        if (password) {
+          console.log('Using password-based auth for reading messages...');
+          const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email,
+              refresh_token: password,
+              client_id: '',
+              type: 'all'
+            })
+          });
+          const data = await response.json();
+          console.log('DongVan password-based response:', JSON.stringify(data).slice(0, 500));
+          
+          return new Response(JSON.stringify({
+            success: data.status === true,
+            data: data.messages || [],
+            code: data.code,
+            message: data.status ? 'Messages retrieved' : (data.message || 'Failed to read mailbox')
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         
-        return new Response(JSON.stringify({
-          success: data.status,
-          data: data.messages || [],
-          code: data.code,
-          message: data.message
+        return new Response(JSON.stringify({ 
+          error: 'Either password or refresh_token+client_id required' 
         }), {
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
