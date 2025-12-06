@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useLiveStock } from '@/hooks/useLiveStock';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/lib/types';
 import { 
@@ -17,7 +18,8 @@ import {
   AlertCircle,
   CheckCircle,
   Minus,
-  Plus
+  Plus,
+  Radio
 } from 'lucide-react';
 
 export default function Buy() {
@@ -25,6 +27,7 @@ export default function Buy() {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { liveStock, isChecking, lastChecked } = useLiveStock();
   const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -93,9 +96,15 @@ export default function Buy() {
     }
   };
 
+  // Get live stock from DongVan API
+  const liveStockCount = useMemo(() => {
+    if (!product) return 0;
+    return liveStock[product.dongvan_id] ?? product.stock;
+  }, [product, liveStock]);
+
   const totalPrice = product ? product.price * quantity : 0;
   const hasEnoughBalance = (profile?.balance || 0) >= totalPrice;
-  const maxQuantity = product ? Math.min(product.stock, Math.floor((profile?.balance || 0) / product.price)) : 0;
+  const maxQuantity = product ? Math.min(liveStockCount, Math.floor((profile?.balance || 0) / product.price)) : 0;
 
   const handlePurchase = async () => {
     if (!product || !user || !hasEnoughBalance) return;
@@ -205,9 +214,15 @@ export default function Buy() {
               <span className="font-bold text-primary">${product.price.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
-              <span className="text-muted-foreground">Available Stock</span>
-              <span className={product.stock > 0 ? 'text-success font-medium' : 'text-destructive'}>
-                {product.stock.toLocaleString()}
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Available Stock</span>
+                <div className="flex items-center gap-1.5">
+                  <Radio className={`h-3 w-3 ${isChecking ? 'text-yellow-500 animate-pulse' : 'text-green-500'}`} />
+                  <span className="text-xs text-muted-foreground">Live</span>
+                </div>
+              </div>
+              <span className={liveStockCount > 0 ? 'text-success font-medium' : 'text-destructive'}>
+                {liveStockCount.toLocaleString()}
               </span>
             </div>
           </CardContent>
@@ -300,7 +315,7 @@ export default function Buy() {
               variant="glow" 
               className="flex-1"
               onClick={handlePurchase}
-              disabled={purchasing || product.stock === 0}
+              disabled={purchasing || liveStockCount === 0}
             >
               {purchasing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
