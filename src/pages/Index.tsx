@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useLiveStock } from '@/hooks/useLiveStock';
 import { 
   Mail, 
   ShoppingCart, 
@@ -17,7 +18,9 @@ import {
   CheckCircle,
   Package,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw,
+  Wifi
 } from 'lucide-react';
 
 export default function Index() {
@@ -26,6 +29,15 @@ export default function Index() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { liveStock, isChecking, lastChecked } = useLiveStock(10000); // Check every 10 seconds
+
+  // Merge live stock with products
+  const productsWithLiveStock = useMemo(() => {
+    return products.map(product => ({
+      ...product,
+      stock: liveStock[product.dongvan_id] ?? product.stock
+    }));
+  }, [products, liveStock]);
 
   useEffect(() => {
     fetchProducts();
@@ -159,13 +171,32 @@ export default function Index() {
               <h2 className="text-2xl font-bold">Available Products</h2>
               <p className="text-muted-foreground">High-quality mail accounts with OAuth2 support</p>
             </div>
+            <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                isChecking 
+                  ? 'bg-warning/10 text-warning border border-warning/20' 
+                  : 'bg-success/10 text-success border border-success/20'
+              }`}>
+                {isChecking ? (
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Wifi className="h-3 w-3" />
+                )}
+                <span>Live Stock</span>
+              </div>
+              {lastChecked && (
+                <span className="text-xs text-muted-foreground">
+                  Updated: {lastChecked.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : products.length === 0 ? (
+          ) : productsWithLiveStock.length === 0 ? (
             <Card className="bg-card/50 border-border/50">
               <CardContent className="py-20 text-center">
                 <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -188,7 +219,7 @@ export default function Index() {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product, index) => (
+                  {productsWithLiveStock.map((product, index) => (
                     <tr 
                       key={product.id} 
                       className="border-b border-border/30 hover:bg-secondary/30 transition-colors"
