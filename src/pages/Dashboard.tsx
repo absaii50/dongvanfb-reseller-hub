@@ -19,7 +19,9 @@ import {
   Mail,
   Eye,
   Copy,
-  Check
+  Check,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -36,6 +38,8 @@ export default function Dashboard() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 10;
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -247,7 +251,9 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((order) => (
+                    {orders
+                      .slice((currentPage - 1) * ordersPerPage, currentPage * ordersPerPage)
+                      .map((order) => (
                       <tr key={order.id} className="border-b border-border/30">
                         <td className="py-3 px-2 font-mono text-sm">{order.id.slice(0, 8)}</td>
                         <td className="py-3 px-2">{order.product?.name || 'Unknown'}</td>
@@ -281,6 +287,46 @@ export default function Dashboard() {
                     ))}
                   </tbody>
                 </table>
+                
+                {/* Pagination */}
+                {orders.length > ordersPerPage && (
+                  <div className="flex items-center justify-between pt-4 border-t border-border/30 mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {((currentPage - 1) * ordersPerPage) + 1}-{Math.min(currentPage * ordersPerPage, orders.length)} of {orders.length} orders
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.ceil(orders.length / ordersPerPage) }, (_, i) => i + 1).map((page) => (
+                          <Button
+                            key={page}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            className="w-8 h-8 p-0"
+                            onClick={() => setCurrentPage(page)}
+                          >
+                            {page}
+                          </Button>
+                        ))}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(Math.ceil(orders.length / ordersPerPage), p + 1))}
+                        disabled={currentPage === Math.ceil(orders.length / ordersPerPage)}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
