@@ -761,7 +761,7 @@ export default function Admin() {
             <div className="space-y-2"><Label>Name</Label><Input value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} /></div>
             <div className="space-y-2"><Label>Description</Label><Input value={productForm.description} onChange={(e) => setProductForm({ ...productForm, description: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Price (USD)</Label><Input type="number" step="0.01" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Price (USD)</Label><Input type="number" step="0.001" value={productForm.price} onChange={(e) => setProductForm({ ...productForm, price: e.target.value })} /></div>
               <div className="space-y-2"><Label>DongVan ID</Label><Input type="number" value={productForm.dongvan_id} onChange={(e) => setProductForm({ ...productForm, dongvan_id: e.target.value })} /></div>
             </div>
             <div className="space-y-2"><Label>Live Duration</Label><Input value={productForm.live_duration} onChange={(e) => setProductForm({ ...productForm, live_duration: e.target.value })} /></div>
