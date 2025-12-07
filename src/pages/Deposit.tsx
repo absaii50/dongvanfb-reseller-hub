@@ -109,10 +109,10 @@ export default function Deposit() {
 
   const handleCreatePayment = async () => {
     const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount < 5) {
+    if (isNaN(numAmount) || numAmount < 10) {
       toast({
         title: 'Invalid amount',
-        description: 'Minimum deposit is $5.00',
+        description: 'Minimum deposit is $10.00',
         variant: 'destructive',
       });
       return;
@@ -250,7 +250,7 @@ export default function Deposit() {
                 Create Payment
               </CardTitle>
               <CardDescription>
-                Enter the amount you want to deposit. Minimum $5.00
+                Enter the amount you want to deposit. Minimum $10.00
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -261,7 +261,7 @@ export default function Deposit() {
                   <Input
                     id="amount"
                     type="number"
-                    min="5"
+                    min="10"
                     step="0.01"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
