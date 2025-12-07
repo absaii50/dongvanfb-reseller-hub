@@ -7,7 +7,9 @@ const corsHeaders = {
 };
 
 // Validation constants
-const MIN_DEPOSIT_AMOUNT = 5;
+// NOWPayments has minimum crypto amounts (~$10-12 for most coins)
+// Setting minimum to $12 to ensure crypto amount is always above minimums
+const MIN_DEPOSIT_AMOUNT = 12;
 const MAX_DEPOSIT_AMOUNT = 10000;
 const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp'];
 
