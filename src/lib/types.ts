@@ -101,3 +101,17 @@ export interface NOWPaymentInvoice {
   price_amount: number;
   price_currency: string;
 }
+
+export interface Popup {
+  id: string;
+  title: string;
+  message: string;
+  image_url: string | null;
+  button_text: string;
+  button_link: string | null;
+  target_countries: string[];
+  is_active: boolean;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}

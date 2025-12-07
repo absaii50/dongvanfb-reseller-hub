@@ -94,6 +94,48 @@ export type Database = {
           },
         ]
       }
+      popups: {
+        Row: {
+          button_link: string | null
+          button_text: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          is_active: boolean
+          message: string
+          priority: number
+          target_countries: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          button_link?: string | null
+          button_text?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          message: string
+          priority?: number
+          target_countries?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          button_link?: string | null
+          button_text?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          message?: string
+          priority?: number
+          target_countries?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           created_at: string
