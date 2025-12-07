@@ -312,6 +312,133 @@ export default function Index() {
           </Card>
         </div>
       </section>
+
+      {/* SEO Content - About Section */}
+      <section className="py-16 border-t border-border/50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold mb-6 text-center">About CryptoMails - Your Trusted Mail Account Provider</h2>
+            <div className="prose prose-invert max-w-none">
+              <p className="text-muted-foreground mb-4">
+                CryptoMails is a leading provider of premium Hotmail and Outlook mail accounts for Facebook verification and social media marketing. 
+                We specialize in delivering high-quality, live-checked email accounts with OAuth2 support, enabling seamless integration with 
+                Microsoft Graph API for reading verification codes and managing your mailbox programmatically.
+              </p>
+              <p className="text-muted-foreground">
+                Our automated platform operates 24/7, ensuring instant delivery of your purchased accounts. With cryptocurrency payment options 
+                including Bitcoin, Ethereum, USDT, and 50+ other cryptocurrencies, we provide a secure and anonymous purchasing experience 
+                for users worldwide.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SEO Content - Why Choose Us */}
+      <section className="py-16 border-t border-border/50 bg-secondary/20">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl font-bold mb-8 text-center">Why Choose CryptoMails?</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {[
+              { title: '100% Live Checked', desc: 'Every mail account is verified and tested before delivery to ensure functionality and quality.' },
+              { title: 'Instant Automated Delivery', desc: 'Receive your mail account credentials within seconds after payment confirmation.' },
+              { title: 'OAuth2 & Graph API Support', desc: 'All accounts support OAuth2 authentication for reading mailbox via Microsoft Graph API.' },
+              { title: 'Cryptocurrency Payments', desc: 'Pay securely with Bitcoin, Ethereum, USDT, Litecoin, and 50+ other cryptocurrencies.' },
+              { title: '24/7 Availability', desc: 'Our automated system operates around the clock - no waiting for business hours.' },
+              { title: 'Competitive Pricing', desc: 'Best prices in the market with various account types to fit every budget and requirement.' },
+            ].map((item, i) => (
+              <Card key={i} className="bg-card/50 border-border/50">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-2 text-foreground">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SEO Content - FAQ Section */}
+      <section className="py-16 border-t border-border/50">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl font-bold mb-8 text-center">Frequently Asked Questions</h2>
+          <div className="max-w-3xl mx-auto space-y-6">
+            {[
+              { 
+                q: 'What payment methods do you accept?', 
+                a: 'We accept all major cryptocurrencies including Bitcoin (BTC), Ethereum (ETH), USDT (TRC20, ERC20), Litecoin (LTC), and 50+ other cryptocurrencies through our secure NOWPayments integration.' 
+              },
+              { 
+                q: 'How long does delivery take?', 
+                a: 'Delivery is instant and fully automated! Once your cryptocurrency payment is confirmed on the blockchain, your mail account credentials are delivered within seconds to your dashboard.' 
+              },
+              { 
+                q: 'Do your mail accounts support OAuth2?', 
+                a: 'Yes, all our Hotmail and Outlook accounts come with full OAuth2 support. This allows you to authenticate and read mailbox contents via Microsoft Graph API - perfect for retrieving verification codes.' 
+              },
+              { 
+                q: 'Are the mail accounts live and verified?', 
+                a: 'Absolutely! Every account is 100% live checked before delivery. We verify login credentials, OAuth2 tokens, and account status to ensure you receive only working, high-quality accounts.' 
+              },
+              { 
+                q: 'Can I read emails and get verification codes?', 
+                a: 'Yes! We provide a built-in Mail Reading Tool that supports bulk credential loading. You can load 30-50+ mail accounts at once and read emails, view HTML content, and automatically detect verification codes.' 
+              },
+              { 
+                q: 'What types of mail accounts do you offer?', 
+                a: 'We offer various Hotmail and Outlook account types with different ages, verification levels, and live durations. All accounts are suitable for Facebook verification and social media marketing purposes.' 
+              },
+            ].map((faq, i) => (
+              <Card key={i} className="bg-card/50 border-border/50">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold mb-2 text-foreground">{faq.q}</h3>
+                  <p className="text-sm text-muted-foreground">{faq.a}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SEO Content - Supported Cryptocurrencies */}
+      <section className="py-16 border-t border-border/50 bg-secondary/20">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-2xl font-bold mb-4">Supported Cryptocurrency Payments</h2>
+          <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
+            We accept 50+ cryptocurrencies for secure and anonymous payments. Popular options include:
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 max-w-3xl mx-auto">
+            {['Bitcoin (BTC)', 'Ethereum (ETH)', 'USDT (TRC20)', 'USDT (ERC20)', 'Litecoin (LTC)', 'Bitcoin Cash (BCH)', 'Dogecoin (DOGE)', 'Monero (XMR)', 'Solana (SOL)', 'Tron (TRX)'].map((crypto) => (
+              <Badge key={crypto} variant="outline" className="px-4 py-2 text-sm border-primary/30">
+                {crypto}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SEO Content - How It Works */}
+      <section className="py-16 border-t border-border/50">
+        <div className="container mx-auto px-4">
+          <h2 className="text-2xl font-bold mb-8 text-center">How It Works</h2>
+          <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+            {[
+              { step: '1', title: 'Create Account', desc: 'Sign up for a free CryptoMails account in seconds' },
+              { step: '2', title: 'Deposit Funds', desc: 'Add balance using your preferred cryptocurrency' },
+              { step: '3', title: 'Choose Products', desc: 'Browse and select the mail accounts you need' },
+              { step: '4', title: 'Instant Delivery', desc: 'Receive credentials immediately after purchase' },
+            ].map((item) => (
+              <div key={item.step} className="text-center">
+                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                  <span className="text-xl font-bold text-primary">{item.step}</span>
+                </div>
+                <h3 className="font-semibold mb-2">{item.title}</h3>
+                <p className="text-sm text-muted-foreground">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </Layout>
   );
 }
