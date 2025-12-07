@@ -102,8 +102,8 @@ serve(async (req) => {
         order_id: `deposit_${user.id}_${Date.now()}`,
         order_description: `CryptoMails Deposit - $${amount}`,
         ipn_callback_url: `${supabaseUrl}/functions/v1/nowpayments-webhook`,
-        success_url: `${supabaseUrl.replace('.supabase.co', '.lovableproject.com')}/dashboard`,
-        cancel_url: `${supabaseUrl.replace('.supabase.co', '.lovableproject.com')}/deposit`,
+        success_url: 'https://cryptomails.world/dashboard',
+        cancel_url: 'https://cryptomails.world/deposit',
       }),
     });
     
