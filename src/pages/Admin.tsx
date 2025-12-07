@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Product, Order, Profile, Deposit } from '@/lib/types';
+import { Product, Order, Profile, Deposit, Popup } from '@/lib/types';
+import { SUPPORTED_COUNTRIES } from '@/lib/geoip';
 import { 
   Loader2, 
   Package,
@@ -32,7 +33,9 @@ import {
   TrendingUp,
   BarChart3,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Bell,
+  Globe
 } from 'lucide-react';
 import {
   Dialog,
@@ -60,6 +63,7 @@ export default function Admin() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
+  const [popups, setPopups] = useState<Popup[]>([]);
   const [apiBalance, setApiBalance] = useState<number | null>(null);
   
   // Search & Filter
@@ -82,6 +86,19 @@ export default function Admin() {
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [balanceAmount, setBalanceAmount] = useState('');
 
+  // Popup editing
+  const [editingPopup, setEditingPopup] = useState<Popup | null>(null);
+  const [popupForm, setPopupForm] = useState({
+    title: '',
+    message: '',
+    image_url: '',
+    button_text: 'OK',
+    button_link: '',
+    target_countries: [] as string[],
+    is_active: true,
+    priority: 0
+  });
+
   useEffect(() => {
     if (!authLoading && (!user || !isAdmin)) {
       toast({
@@ -101,17 +118,19 @@ export default function Admin() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, ordersRes, usersRes, depositsRes] = await Promise.all([
+      const [productsRes, ordersRes, usersRes, depositsRes, popupsRes] = await Promise.all([
         supabase.from('products').select('*').order('created_at', { ascending: false }),
         supabase.from('orders').select('*, product:products(*)').order('created_at', { ascending: false }).limit(100),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('deposits').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('popups').select('*').order('priority', { ascending: false }),
       ]);
 
       if (productsRes.data) setProducts(productsRes.data.map(p => ({ ...p, price: Number(p.price) })));
       if (ordersRes.data) setOrders(ordersRes.data.map(o => ({ ...o, total_price: Number(o.total_price) })));
       if (usersRes.data) setUsers(usersRes.data.map(u => ({ ...u, balance: Number(u.balance) })));
       if (depositsRes.data) setDeposits(depositsRes.data.map(d => ({ ...d, amount: Number(d.amount) })));
+      if (popupsRes.data) setPopups(popupsRes.data as Popup[]);
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -301,6 +320,72 @@ export default function Admin() {
     }
   };
 
+  // Popup management functions
+  const savePopup = async () => {
+    try {
+      const popupData = {
+        title: popupForm.title,
+        message: popupForm.message,
+        image_url: popupForm.image_url || null,
+        button_text: popupForm.button_text || 'OK',
+        button_link: popupForm.button_link || null,
+        target_countries: popupForm.target_countries,
+        is_active: popupForm.is_active,
+        priority: popupForm.priority
+      };
+
+      if (editingPopup?.id) {
+        const { error } = await supabase.from('popups').update(popupData).eq('id', editingPopup.id);
+        if (error) throw error;
+        toast({ title: 'Success', description: 'Popup updated' });
+      } else {
+        const { error } = await supabase.from('popups').insert(popupData);
+        if (error) throw error;
+        toast({ title: 'Success', description: 'Popup created' });
+      }
+
+      setEditingPopup(null);
+      resetPopupForm();
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const deletePopup = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this popup?')) return;
+    try {
+      const { error } = await supabase.from('popups').delete().eq('id', id);
+      if (error) throw error;
+      toast({ title: 'Success', description: 'Popup deleted' });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const togglePopupCountry = (code: string) => {
+    setPopupForm(prev => ({
+      ...prev,
+      target_countries: prev.target_countries.includes(code)
+        ? prev.target_countries.filter(c => c !== code)
+        : [...prev.target_countries, code]
+    }));
+  };
+
+  const resetPopupForm = () => {
+    setPopupForm({
+      title: '',
+      message: '',
+      image_url: '',
+      button_text: 'OK',
+      button_link: '',
+      target_countries: [],
+      is_active: true,
+      priority: 0
+    });
+  };
+
   // Export functions
   const exportToCSV = (data: any[], filename: string) => {
     if (data.length === 0) {
@@ -455,6 +540,7 @@ export default function Admin() {
             <TabsTrigger value="products"><Package className="h-4 w-4 mr-2" />Products</TabsTrigger>
             <TabsTrigger value="orders"><ShoppingBag className="h-4 w-4 mr-2" />Orders</TabsTrigger>
             <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>
+            <TabsTrigger value="popups"><Bell className="h-4 w-4 mr-2" />Popups</TabsTrigger>
           </TabsList>
 
           {/* Analytics Tab */}
@@ -750,6 +836,88 @@ export default function Admin() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Popups Tab */}
+          <TabsContent value="popups">
+            <Card className="bg-card/50 border-border/50">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Geo Popups</CardTitle>
+                  <CardDescription>Manage notification popups by country</CardDescription>
+                </div>
+                <Button onClick={() => {
+                  resetPopupForm();
+                  setEditingPopup({} as Popup);
+                }}>
+                  <Plus className="h-4 w-4 mr-1" />Add Popup
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border/50">
+                        <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Title</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Countries</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Priority</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Status</th>
+                        <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {popups.map((popup) => (
+                        <tr key={popup.id} className="border-b border-border/30">
+                          <td className="py-3 px-2">
+                            <div>
+                              <p className="font-medium">{popup.title}</p>
+                              <p className="text-sm text-muted-foreground line-clamp-1">{popup.message}</p>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            {popup.target_countries?.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 justify-center">
+                                {popup.target_countries.map(code => {
+                                  const country = SUPPORTED_COUNTRIES.find(c => c.code === code);
+                                  return <Badge key={code} variant="outline" className="text-xs">{country?.flag} {code}</Badge>;
+                                })}
+                              </div>
+                            ) : (
+                              <Badge className="bg-primary/20 text-primary"><Globe className="h-3 w-3 mr-1" />Universal</Badge>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-center">{popup.priority}</td>
+                          <td className="py-3 px-2 text-center">
+                            <Badge variant={popup.is_active ? 'default' : 'secondary'}>{popup.is_active ? 'Active' : 'Inactive'}</Badge>
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                setEditingPopup(popup);
+                                setPopupForm({
+                                  title: popup.title,
+                                  message: popup.message,
+                                  image_url: popup.image_url || '',
+                                  button_text: popup.button_text || 'OK',
+                                  button_link: popup.button_link || '',
+                                  target_countries: popup.target_countries || [],
+                                  is_active: popup.is_active,
+                                  priority: popup.priority
+                                });
+                              }}><Edit className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => deletePopup(popup.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {popups.length === 0 && (
+                        <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No popups created yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -799,6 +967,74 @@ export default function Admin() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
             <Button onClick={updateUserBalance} disabled={!balanceAmount}><Save className="h-4 w-4 mr-1" />Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Popup Dialog */}
+      <Dialog open={!!editingPopup} onOpenChange={() => setEditingPopup(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editingPopup?.id ? 'Edit Popup' : 'Add Popup'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input value={popupForm.title} onChange={(e) => setPopupForm({ ...popupForm, title: e.target.value })} placeholder="Welcome!" />
+            </div>
+            <div className="space-y-2">
+              <Label>Message *</Label>
+              <textarea 
+                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={popupForm.message} 
+                onChange={(e) => setPopupForm({ ...popupForm, message: e.target.value })} 
+                placeholder="Your notification message..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Image URL (optional)</Label>
+              <Input value={popupForm.image_url} onChange={(e) => setPopupForm({ ...popupForm, image_url: e.target.value })} placeholder="https://..." />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Button Text</Label>
+                <Input value={popupForm.button_text} onChange={(e) => setPopupForm({ ...popupForm, button_text: e.target.value })} placeholder="OK" />
+              </div>
+              <div className="space-y-2">
+                <Label>Button Link (optional)</Label>
+                <Input value={popupForm.button_link} onChange={(e) => setPopupForm({ ...popupForm, button_link: e.target.value })} placeholder="https://..." />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Target Countries (leave empty for Universal)</Label>
+              <div className="flex flex-wrap gap-2 p-3 bg-secondary/30 rounded-lg">
+                {SUPPORTED_COUNTRIES.map(country => (
+                  <Badge 
+                    key={country.code}
+                    variant={popupForm.target_countries.includes(country.code) ? 'default' : 'outline'}
+                    className="cursor-pointer transition-colors"
+                    onClick={() => togglePopupCountry(country.code)}
+                  >
+                    {country.flag} {country.name}
+                  </Badge>
+                ))}
+              </div>
+              {popupForm.target_countries.length === 0 && (
+                <p className="text-xs text-muted-foreground">🌍 Universal: Shows to all countries</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Priority (higher = show first)</Label>
+                <Input type="number" value={popupForm.priority} onChange={(e) => setPopupForm({ ...popupForm, priority: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Switch checked={popupForm.is_active} onCheckedChange={(checked) => setPopupForm({ ...popupForm, is_active: checked })} />
+                <Label>Active</Label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingPopup(null)}>Cancel</Button>
+            <Button onClick={savePopup} disabled={!popupForm.title || !popupForm.message}><Save className="h-4 w-4 mr-1" />Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
