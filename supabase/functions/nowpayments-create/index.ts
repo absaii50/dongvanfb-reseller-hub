@@ -7,8 +7,9 @@ const corsHeaders = {
 };
 
 // Validation constants
-// NOWPayments minimum is ~$10, setting to $10.50 to cover fees
-const MIN_DEPOSIT_AMOUNT = 10.5;
+// User sees $10 minimum, but we add small buffer for NOWPayments crypto minimum
+const MIN_DEPOSIT_AMOUNT = 10;
+const NOWPAYMENTS_BUFFER = 0.60; // Extra amount to cover crypto conversion fees
 const MAX_DEPOSIT_AMOUNT = 10000;
 const ALLOWED_CURRENCIES = ['usd', 'eur', 'gbp'];
 
@@ -84,6 +85,10 @@ serve(async (req) => {
     
     console.log(`Creating payment for user ${user.id}: $${amount}`);
     
+    // Add buffer to ensure NOWPayments accepts the crypto amount
+    const paymentAmount = amount + NOWPAYMENTS_BUFFER;
+    console.log(`Payment amount with buffer: $${paymentAmount}`);
+    
     // Create payment with NOWPayments
     const paymentResponse = await fetch('https://api.nowpayments.io/v1/invoice', {
       method: 'POST',
@@ -92,7 +97,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        price_amount: amount,
+        price_amount: paymentAmount,
         price_currency: currency.toLowerCase(),
         order_id: `deposit_${user.id}_${Date.now()}`,
         order_description: `CryptoMails Deposit - $${amount}`,
