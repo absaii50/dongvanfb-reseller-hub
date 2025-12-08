@@ -90,12 +90,32 @@ export default function Auth() {
     }
   };
 
+  const authJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: isSignUp ? 'Create Account - CryptoMails' : 'Sign In - CryptoMails',
+    description: isSignUp 
+      ? 'Create a CryptoMails account to start purchasing premium mail accounts with cryptocurrency.' 
+      : 'Sign in to your CryptoMails account to manage orders and deposits.',
+    url: `https://cryptomails.world/auth${isSignUp ? '?mode=signup' : ''}`
+  };
+
   return (
     <>
       <Helmet>
-        <title>{isSignUp ? 'Create Account' : 'Sign In'} - CryptoMails</title>
-        <meta name="description" content={isSignUp ? 'Create a CryptoMails account to start purchasing premium mail accounts with cryptocurrency.' : 'Sign in to your CryptoMails account to manage orders and deposits.'} />
+        <title>{isSignUp ? 'Create Account - Start Buying Mail Accounts' : 'Sign In to Your Account'} | CryptoMails</title>
+        <meta name="title" content={isSignUp ? 'Create Account - Start Buying Mail Accounts | CryptoMails' : 'Sign In to Your Account | CryptoMails'} />
+        <meta name="description" content={isSignUp 
+          ? 'Create a free CryptoMails account to start purchasing premium Hotmail & Outlook mail accounts with cryptocurrency. Instant delivery, 24/7 service.' 
+          : 'Sign in to your CryptoMails account to manage orders, view purchase history, and deposit funds with cryptocurrency.'} />
+        <meta name="keywords" content={isSignUp ? 'create account, sign up, register, mail accounts, cryptocurrency' : 'sign in, login, account access, cryptomails'} />
         <link rel="canonical" href={`https://cryptomails.world/auth${isSignUp ? '?mode=signup' : ''}`} />
+        <meta property="og:title" content={isSignUp ? 'Create Account | CryptoMails' : 'Sign In | CryptoMails'} />
+        <meta property="og:description" content={isSignUp 
+          ? 'Create a free CryptoMails account to start purchasing premium mail accounts.' 
+          : 'Sign in to manage your CryptoMails orders and deposits.'} />
+        <meta property="og:url" content={`https://cryptomails.world/auth${isSignUp ? '?mode=signup' : ''}`} />
+        <script type="application/ld+json">{JSON.stringify(authJsonLd)}</script>
       </Helmet>
       <div className="min-h-screen bg-background bg-grid-pattern flex items-center justify-center p-4">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />

@@ -107,12 +107,27 @@ export default function Index() {
     navigate(`/buy/${product.id}`);
   };
 
+  const homeJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'CryptoMails',
+    url: 'https://cryptomails.world/',
+    description: 'Premium mail account provider for Facebook verification with cryptocurrency payments',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: 'https://cryptomails.world/search?q={search_term_string}',
+      'query-input': 'required name=search_term_string'
+    }
+  };
+
   return (
     <Layout>
       <SEO 
-        title="CryptoMails - Buy Premium Facebook Mail Accounts with Cryptocurrency"
-        description="Buy premium Hotmail & Outlook mail accounts for Facebook verification. Instant delivery, cryptocurrency payments, OAuth2 support, and 24/7 automated service."
+        title="Buy Premium Facebook Mail Accounts with Cryptocurrency"
+        description="Buy premium Hotmail & Outlook mail accounts for Facebook verification. Instant delivery, cryptocurrency payments (Bitcoin, USDT, Ethereum), OAuth2 support, and 24/7 automated service. Trusted by thousands."
         canonical="/"
+        keywords="buy mail accounts, facebook mail accounts, hotmail accounts for sale, outlook accounts, crypto payment, bitcoin mail, cryptocurrency email, email verification, oauth2 mail, bulk mail accounts, instant delivery mail"
+        jsonLd={homeJsonLd}
       />
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">

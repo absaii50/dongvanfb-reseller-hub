@@ -223,9 +223,11 @@ export default function Deposit() {
   return (
     <Layout>
       <SEO 
-        title="Deposit Funds - CryptoMails"
-        description="Add funds to your CryptoMails account using cryptocurrency. Bitcoin, Ethereum, USDT and more accepted."
+        title="Deposit Funds with Cryptocurrency"
+        description="Add funds to your CryptoMails account using cryptocurrency. We accept Bitcoin (BTC), Ethereum (ETH), USDT, Litecoin and 50+ other cryptocurrencies. Instant balance updates."
         canonical="/deposit"
+        keywords="crypto deposit, bitcoin deposit, USDT payment, cryptocurrency payment, add funds, wallet deposit"
+        noindex={true}
       />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-8 text-center">

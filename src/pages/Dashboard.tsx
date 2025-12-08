@@ -184,9 +184,11 @@ export default function Dashboard() {
   return (
     <Layout>
       <SEO 
-        title="Dashboard - CryptoMails"
-        description="Manage your CryptoMails account, view order history, and track your deposits."
+        title="Dashboard - Manage Your Orders & Balance"
+        description="Manage your CryptoMails account, view order history, download purchased mail credentials, and track your cryptocurrency deposits."
         canonical="/dashboard"
+        keywords="cryptomails dashboard, order history, mail accounts, deposit tracking, account management"
+        noindex={true}
       />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
