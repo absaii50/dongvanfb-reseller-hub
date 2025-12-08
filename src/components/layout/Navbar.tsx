@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { LogOut, User, Settings, Wallet, ShoppingBag, Mail, Shield } from 'lucide-react';
+import { LogOut, User, Settings, Wallet, ShoppingBag, Mail, Shield, Menu, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,14 +10,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 export function Navbar() {
   const { user, profile, isAdmin, signOut } = useAuth();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
+    setMobileMenuOpen(false);
     navigate('/');
+  };
+
+  const handleNavigate = (path: string) => {
+    setMobileMenuOpen(false);
+    navigate(path);
   };
 
   return (
@@ -33,6 +48,7 @@ export function Navbar() {
             <span className="text-xl font-bold text-gradient">CryptoMails</span>
           </Link>
 
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
             <Link to="/" className="text-muted-foreground hover:text-foreground transition-colors">
               Products
@@ -53,6 +69,7 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Desktop User Menu */}
             {user ? (
               <>
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 border border-border/50">
@@ -61,7 +78,7 @@ export function Navbar() {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full">
+                    <Button variant="ghost" size="icon" className="rounded-full hidden md:flex">
                       <User className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -98,7 +115,7 @@ export function Navbar() {
                 </DropdownMenu>
               </>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2">
                 <Button variant="ghost" onClick={() => navigate('/auth')}>
                   Sign In
                 </Button>
@@ -107,6 +124,122 @@ export function Navbar() {
                 </Button>
               </div>
             )}
+
+            {/* Mobile Menu Button */}
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[280px] sm:w-[350px]">
+                <SheetHeader>
+                  <SheetTitle className="flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-primary" />
+                    CryptoMails
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 mt-6">
+                  {user && (
+                    <div className="p-4 rounded-lg bg-secondary/50 border border-border/50">
+                      <p className="text-sm text-muted-foreground">Signed in as</p>
+                      <p className="font-medium truncate">{profile?.email}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Wallet className="h-4 w-4 text-primary" />
+                        <span className="font-bold text-primary">${profile?.balance?.toFixed(2) || '0.00'}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      variant="ghost" 
+                      className="justify-start" 
+                      onClick={() => handleNavigate('/')}
+                    >
+                      <ShoppingBag className="mr-2 h-4 w-4" />
+                      Products
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      className="justify-start" 
+                      onClick={() => handleNavigate('/tools')}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      Tools
+                    </Button>
+                    {user && (
+                      <>
+                        <Button 
+                          variant="ghost" 
+                          className="justify-start" 
+                          onClick={() => handleNavigate('/dashboard')}
+                        >
+                          <ShoppingBag className="mr-2 h-4 w-4" />
+                          Dashboard
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          className="justify-start" 
+                          onClick={() => handleNavigate('/deposit')}
+                        >
+                          <Wallet className="mr-2 h-4 w-4" />
+                          Deposit Funds
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          className="justify-start" 
+                          onClick={() => handleNavigate('/settings')}
+                        >
+                          <Settings className="mr-2 h-4 w-4" />
+                          Account Settings
+                        </Button>
+                        {isAdmin && (
+                          <Button 
+                            variant="ghost" 
+                            className="justify-start" 
+                            onClick={() => handleNavigate('/admin')}
+                          >
+                            <Shield className="mr-2 h-4 w-4" />
+                            Admin Panel
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="border-t border-border/50 pt-4">
+                    {user ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full text-destructive" 
+                        onClick={handleSignOut}
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </Button>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="w-full" 
+                          onClick={() => handleNavigate('/auth')}
+                        >
+                          Sign In
+                        </Button>
+                        <Button 
+                          variant="glow" 
+                          className="w-full" 
+                          onClick={() => handleNavigate('/auth?mode=signup')}
+                        >
+                          Get Started
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>

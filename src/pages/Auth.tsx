@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,8 +91,14 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen bg-background bg-grid-pattern flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+    <>
+      <Helmet>
+        <title>{isSignUp ? 'Create Account' : 'Sign In'} - CryptoMails</title>
+        <meta name="description" content={isSignUp ? 'Create a CryptoMails account to start purchasing premium mail accounts with cryptocurrency.' : 'Sign in to your CryptoMails account to manage orders and deposits.'} />
+        <link rel="canonical" href={`https://cryptomails.world/auth${isSignUp ? '?mode=signup' : ''}`} />
+      </Helmet>
+      <div className="min-h-screen bg-background bg-grid-pattern flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
       
       <Card className="w-full max-w-md relative glass border-border/50">
         <CardHeader className="text-center">
@@ -164,6 +171,7 @@ export default function Auth() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </>
   );
 }

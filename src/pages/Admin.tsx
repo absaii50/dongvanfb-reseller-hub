@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -440,6 +441,11 @@ export default function Admin() {
 
   return (
     <Layout>
+      <SEO 
+        title="Admin Panel - CryptoMails"
+        description="CryptoMails admin panel - manage products, orders, users, and deposits."
+        canonical="/admin"
+      />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>

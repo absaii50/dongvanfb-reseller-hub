@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -221,6 +222,11 @@ export default function Deposit() {
 
   return (
     <Layout>
+      <SEO 
+        title="Deposit Funds - CryptoMails"
+        description="Add funds to your CryptoMails account using cryptocurrency. Bitcoin, Ethereum, USDT and more accepted."
+        canonical="/deposit"
+      />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold mb-2">Deposit Funds</h1>
