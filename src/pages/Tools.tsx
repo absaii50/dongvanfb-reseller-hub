@@ -299,12 +299,27 @@ export default function Tools() {
     );
   };
 
+  const toolsJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'CryptoMails Mailbox Reader',
+    applicationCategory: 'UtilitiesApplication',
+    description: 'Read and manage mail accounts with bulk credential loading and automatic verification code detection.',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'USD'
+    }
+  };
+
   return (
     <Layout>
       <SEO 
-        title="Mail Tools - CryptoMails"
-        description="Read and manage your mail accounts with our built-in mailbox reader. Supports bulk credential loading and verification code detection."
+        title="Mail Tools - Read Mailbox & Get Verification Codes"
+        description="Free mailbox reader tool to manage your mail accounts. Supports bulk credential loading (30-50+ emails), automatic verification code detection, and HTML email viewing via OAuth2."
         canonical="/tools"
+        keywords="mailbox reader, email verification code, bulk mail loader, oauth2 mail reader, microsoft graph api, hotmail reader, outlook reader"
+        jsonLd={toolsJsonLd}
       />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">

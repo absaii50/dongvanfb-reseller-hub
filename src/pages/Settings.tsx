@@ -214,9 +214,11 @@ export default function Settings() {
   return (
     <Layout>
       <SEO 
-        title="Account Settings - CryptoMails"
-        description="Manage your CryptoMails account settings, change password, update email, and notification preferences."
+        title="Account Settings - Manage Your Profile"
+        description="Manage your CryptoMails account settings. Change password, update email address, and configure notification preferences for orders and deposits."
         canonical="/settings"
+        keywords="account settings, change password, update email, notification preferences"
+        noindex={true}
       />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">

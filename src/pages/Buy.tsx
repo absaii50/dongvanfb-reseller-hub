@@ -166,12 +166,33 @@ export default function Buy() {
     );
   }
 
+  const productJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || `Premium ${product.name} mail accounts with OAuth2 support`,
+    offers: {
+      '@type': 'Offer',
+      price: product.price.toFixed(2),
+      priceCurrency: 'USD',
+      availability: liveStockCount > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      seller: {
+        '@type': 'Organization',
+        name: 'CryptoMails'
+      }
+    }
+  };
+
   return (
     <Layout>
       <SEO 
-        title={`Buy ${product.name} - CryptoMails`}
-        description={`Purchase ${product.name} mail accounts at $${product.price.toFixed(2)} each. Instant delivery with cryptocurrency payment.`}
+        title={`Buy ${product.name} - $${product.price.toFixed(2)} Each`}
+        description={`Purchase ${product.name} mail accounts at $${product.price.toFixed(2)} each. ${liveStockCount.toLocaleString()} in stock. Instant delivery with cryptocurrency payment. OAuth2 support included.`}
         canonical={`/buy/${productId}`}
+        type="product"
+        keywords={`buy ${product.name.toLowerCase()}, ${product.name.toLowerCase()} for sale, mail accounts, crypto payment`}
+        noindex={true}
+        jsonLd={productJsonLd}
       />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-8">

@@ -12,8 +12,9 @@ const NotFound = () => {
   return (
     <>
       <Helmet>
-        <title>Page Not Found - CryptoMails</title>
-        <meta name="description" content="The page you're looking for doesn't exist." />
+        <title>404 - Page Not Found | CryptoMails</title>
+        <meta name="description" content="The page you're looking for doesn't exist. Return to CryptoMails homepage to browse premium mail accounts." />
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="flex min-h-screen items-center justify-center bg-muted">
       <div className="text-center">

@@ -442,9 +442,10 @@ export default function Admin() {
   return (
     <Layout>
       <SEO 
-        title="Admin Panel - CryptoMails"
-        description="CryptoMails admin panel - manage products, orders, users, and deposits."
+        title="Admin Panel"
+        description="CryptoMails admin panel - manage products, orders, users, deposits, and geo-targeted popups."
         canonical="/admin"
+        noindex={true}
       />
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-8">
