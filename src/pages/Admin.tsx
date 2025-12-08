@@ -36,7 +36,8 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Bell,
-  Globe
+  Globe,
+  Activity
 } from 'lucide-react';
 import {
   Dialog,
@@ -60,12 +61,14 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [checkingBalance, setCheckingBalance] = useState(false);
+  const [checkingHealth, setCheckingHealth] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [popups, setPopups] = useState<Popup[]>([]);
   const [apiBalance, setApiBalance] = useState<number | null>(null);
+  const [apiHealth, setApiHealth] = useState<{ status: string; latency_ms: number; checked_at: string } | null>(null);
   
   // Search & Filter
   const [userSearch, setUserSearch] = useState('');
@@ -205,6 +208,36 @@ export default function Admin() {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setCheckingBalance(false);
+    }
+  };
+
+  const checkApiHealth = async () => {
+    setCheckingHealth(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('dongvan-api', {
+        body: { action: 'health_check' }
+      });
+      
+      if (error) throw error;
+      
+      if (data.success && data.data) {
+        setApiHealth(data.data);
+        const statusMsg = data.data.status === 'healthy' 
+          ? `API Healthy (${data.data.latency_ms}ms)` 
+          : `API ${data.data.status} (${data.data.latency_ms}ms)`;
+        toast({ 
+          title: 'Health Check Complete', 
+          description: statusMsg,
+          variant: data.data.status === 'healthy' ? 'default' : 'destructive'
+        });
+      } else {
+        throw new Error(data.error || 'Health check failed');
+      }
+    } catch (error: any) {
+      setApiHealth({ status: 'offline', latency_ms: 0, checked_at: new Date().toISOString() });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setCheckingHealth(false);
     }
   };
 
@@ -453,14 +486,33 @@ export default function Admin() {
             <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
             <p className="text-muted-foreground">Manage products, orders, users, and deposits</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={checkApiBalance} disabled={checkingBalance}>
-              {checkingBalance ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Wallet className="h-4 w-4 mr-1" />}
-              {apiBalance !== null ? `${apiBalance.toLocaleString()}₫` : 'Check Balance'}
+          <div className="flex items-center gap-2 flex-wrap">
+            {apiHealth && (
+              <Badge 
+                variant="outline" 
+                className={
+                  apiHealth.status === 'healthy' ? 'border-success/30 text-success' :
+                  apiHealth.status === 'degraded' ? 'border-warning/30 text-warning' :
+                  'border-destructive/30 text-destructive'
+                }
+              >
+                {apiHealth.status === 'healthy' ? <CheckCircle className="h-3 w-3 mr-1" /> :
+                 apiHealth.status === 'degraded' ? <Clock className="h-3 w-3 mr-1" /> :
+                 <XCircle className="h-3 w-3 mr-1" />}
+                API: {apiHealth.status} ({apiHealth.latency_ms}ms)
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={checkApiHealth} disabled={checkingHealth}>
+              {checkingHealth ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Activity className="h-4 w-4 mr-1" />}
+              Health
             </Button>
-            <Button variant="outline" onClick={syncProducts} disabled={syncing}>
+            <Button variant="outline" size="sm" onClick={checkApiBalance} disabled={checkingBalance}>
+              {checkingBalance ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Wallet className="h-4 w-4 mr-1" />}
+              {apiBalance !== null ? `${apiBalance.toLocaleString()}₫` : 'Balance'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={syncProducts} disabled={syncing}>
               {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-              Sync Products
+              Sync
             </Button>
           </div>
         </div>

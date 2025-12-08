@@ -21,7 +21,9 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
-  Wifi
+  Wifi,
+  WifiOff,
+  Database
 } from 'lucide-react';
 
 export default function Index() {
@@ -30,7 +32,7 @@ export default function Index() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { liveStock, isChecking, isInitialLoading, lastChecked } = useLiveStock(10000); // Check every 10 seconds
+  const { liveStock, isChecking, isInitialLoading, lastChecked, useFallback } = useLiveStock(10000); // Check every 10 seconds
 
   // Merge live stock with products
   const productsWithLiveStock = useMemo(() => {
@@ -193,21 +195,33 @@ export default function Index() {
               <p className="text-muted-foreground">High-quality mail accounts with OAuth2 support</p>
             </div>
             <div className="flex items-center gap-2">
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
-                isChecking 
-                  ? 'bg-warning/10 text-warning border border-warning/20' 
-                  : 'bg-success/10 text-success border border-success/20'
-              }`}>
-                {isChecking ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Wifi className="h-3 w-3" />
-                )}
-                <span>Live Stock</span>
-              </div>
-              {lastChecked && (
+              {useFallback ? (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                  <Database className="h-3 w-3" />
+                  <span>Cached Stock</span>
+                </div>
+              ) : (
+                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                  isChecking 
+                    ? 'bg-warning/10 text-warning border border-warning/20' 
+                    : 'bg-success/10 text-success border border-success/20'
+                }`}>
+                  {isChecking ? (
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Wifi className="h-3 w-3" />
+                  )}
+                  <span>Live Stock</span>
+                </div>
+              )}
+              {lastChecked && !useFallback && (
                 <span className="text-xs text-muted-foreground">
                   Updated: {lastChecked.toLocaleTimeString()}
+                </span>
+              )}
+              {useFallback && (
+                <span className="text-xs text-muted-foreground">
+                  API unavailable - showing database stock
                 </span>
               )}
             </div>
