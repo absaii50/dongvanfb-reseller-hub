@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -300,6 +301,11 @@ export default function Tools() {
 
   return (
     <Layout>
+      <SEO 
+        title="Mail Tools - CryptoMails"
+        description="Read and manage your mail accounts with our built-in mailbox reader. Supports bulk credential loading and verification code detection."
+        canonical="/tools"
+      />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Mail Tools</h1>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { SEO } from '@/components/SEO';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -108,6 +109,11 @@ export default function Index() {
 
   return (
     <Layout>
+      <SEO 
+        title="CryptoMails - Buy Premium Facebook Mail Accounts with Cryptocurrency"
+        description="Buy premium Hotmail & Outlook mail accounts for Facebook verification. Instant delivery, cryptocurrency payments, OAuth2 support, and 24/7 automated service."
+        canonical="/"
+      />
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />

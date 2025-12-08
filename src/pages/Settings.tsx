@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '@/components/layout/Layout';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -212,6 +213,11 @@ export default function Settings() {
 
   return (
     <Layout>
+      <SEO 
+        title="Account Settings - CryptoMails"
+        description="Manage your CryptoMails account settings, change password, update email, and notification preferences."
+        canonical="/settings"
+      />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Account Settings</h1>
