@@ -117,6 +117,7 @@ export default function Admin() {
   useEffect(() => {
     if (isAdmin) {
       fetchData();
+      checkApiHealth();
     }
   }, [isAdmin]);
 
