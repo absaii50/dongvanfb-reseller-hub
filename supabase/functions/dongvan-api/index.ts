@@ -459,6 +459,76 @@ serve(async (req) => {
         });
       }
       
+      case 'health_check': {
+        // Admin-only endpoint to check API connectivity
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: 'Unauthorized - Admin access required' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (authError || !user) {
+          return new Response(JSON.stringify({ error: 'Invalid token' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // Verify admin role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .single();
+        
+        if (!roleData) {
+          return new Response(JSON.stringify({ error: 'Forbidden - Admin access required' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        const startTime = Date.now();
+        let apiStatus = 'unknown';
+        let latency = 0;
+        let error_message = '';
+        
+        try {
+          const response = await fetchWithRetry(`${DONGVAN_API_BASE}/user/account_type?apikey=${apiKey}`, undefined, 1);
+          latency = Date.now() - startTime;
+          
+          if (response.ok) {
+            const data = await safeJsonParse(response, 'Health check');
+            apiStatus = data.status ? 'healthy' : 'degraded';
+          } else {
+            apiStatus = 'error';
+            error_message = `HTTP ${response.status}`;
+          }
+        } catch (err) {
+          latency = Date.now() - startTime;
+          apiStatus = 'offline';
+          error_message = err instanceof Error ? err.message : 'Connection failed';
+        }
+        
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            status: apiStatus,
+            latency_ms: latency,
+            error: error_message || undefined,
+            checked_at: new Date().toISOString()
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,
