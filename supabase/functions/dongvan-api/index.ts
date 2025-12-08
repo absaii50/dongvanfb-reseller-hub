@@ -34,6 +34,31 @@ const sanitizeString = (str: unknown, maxLength = 500): string => {
   return str.trim().slice(0, maxLength);
 };
 
+// Helper to fetch with retry for transient network errors
+const fetchWithRetry = async (url: string, options?: RequestInit, maxRetries = 3): Promise<Response> => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.warn(`Fetch attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+      
+      // Only retry on network errors (connection reset, timeout, etc.)
+      if (attempt < maxRetries) {
+        // Exponential backoff: 500ms, 1000ms, 2000ms
+        const delay = 500 * Math.pow(2, attempt - 1);
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Fetch failed after retries');
+};
+
 // Helper to safely parse JSON responses from external APIs
 const safeJsonParse = async (response: Response, context: string): Promise<any> => {
   const text = await response.text();
@@ -108,7 +133,7 @@ serve(async (req) => {
           });
         }
         
-        const response = await fetch(`${DONGVAN_API_BASE}/user/balance?apikey=${apiKey}`);
+        const response = await fetchWithRetry(`${DONGVAN_API_BASE}/user/balance?apikey=${apiKey}`);
         const data = await safeJsonParse(response, 'DongVan balance');
         console.log('DongVan balance response:', data);
         return new Response(JSON.stringify({
@@ -122,7 +147,7 @@ serve(async (req) => {
       
       case 'get_products': {
         // Public endpoint - products info is meant to be visible
-        const response = await fetch(`${DONGVAN_API_BASE}/user/account_type?apikey=${apiKey}`);
+        const response = await fetchWithRetry(`${DONGVAN_API_BASE}/user/account_type?apikey=${apiKey}`);
         const data = await safeJsonParse(response, 'DongVan products');
         console.log('DongVan products response:', data);
         
@@ -233,7 +258,7 @@ serve(async (req) => {
         const buyUrl = `${DONGVAN_API_BASE}/user/buy?apikey=${apiKey}&account_type=${product.dongvan_id}&quality=${quantity}&type=full`;
         console.log('Buying from DongVan:', buyUrl);
         
-        const response = await fetch(buyUrl);
+        const response = await fetchWithRetry(buyUrl);
         const data = await safeJsonParse(response, 'DongVan buy');
         
         console.log('DongVan buy response:', data);
@@ -317,7 +342,7 @@ serve(async (req) => {
         // For Graph API mails with OAuth2 tokens - use graph_messages endpoint
         if (sanitizedRefreshToken && sanitizedClientId) {
           console.log('Using OAuth2 Graph API for reading messages...');
-          const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/graph_messages`, {
+          const response = await fetchWithRetry(`${DONGVAN_TOOLS_BASE}/api/graph_messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -341,7 +366,7 @@ serve(async (req) => {
         // For IMAP/password-based mails - try get_code_oauth2 with type=all
         if (sanitizedPassword) {
           console.log('Using password-based auth for reading messages...');
-          const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
+          const response = await fetchWithRetry(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -395,7 +420,7 @@ serve(async (req) => {
         
         // For Graph API mails with OAuth2
         if (sanitizedRefreshToken && sanitizedClientId) {
-          const response = await fetch(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
+          const response = await fetchWithRetry(`${DONGVAN_TOOLS_BASE}/api/get_code_oauth2`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -418,7 +443,7 @@ serve(async (req) => {
         }
         
         // For simple Facebook code retrieval
-        const response = await fetch(
+        const response = await fetchWithRetry(
           `${DONGVAN_API_BASE}/user/get_code_facebook?apikey=${apiKey}&email=${encodeURIComponent(sanitizedEmail)}`
         );
         const data = await safeJsonParse(response, 'DongVan getcode Facebook');
