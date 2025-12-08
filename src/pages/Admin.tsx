@@ -69,6 +69,7 @@ export default function Admin() {
   const [popups, setPopups] = useState<Popup[]>([]);
   const [apiBalance, setApiBalance] = useState<number | null>(null);
   const [apiHealth, setApiHealth] = useState<{ status: string; latency_ms: number; checked_at: string } | null>(null);
+  const [lastHealthCheck, setLastHealthCheck] = useState<Date | null>(null);
   
   // Search & Filter
   const [userSearch, setUserSearch] = useState('');
@@ -117,7 +118,14 @@ export default function Admin() {
   useEffect(() => {
     if (isAdmin) {
       fetchData();
-      checkApiHealth();
+      checkApiHealth(true); // silent on initial load
+      
+      // Periodic health check every 5 minutes
+      const healthInterval = setInterval(() => {
+        checkApiHealth(true);
+      }, 5 * 60 * 1000);
+      
+      return () => clearInterval(healthInterval);
     }
   }, [isAdmin]);
 
@@ -212,7 +220,7 @@ export default function Admin() {
     }
   };
 
-  const checkApiHealth = async () => {
+  const checkApiHealth = async (silent = false) => {
     setCheckingHealth(true);
     try {
       const { data, error } = await supabase.functions.invoke('dongvan-api', {
@@ -223,23 +231,40 @@ export default function Admin() {
       
       if (data.success && data.data) {
         setApiHealth(data.data);
-        const statusMsg = data.data.status === 'healthy' 
-          ? `API Healthy (${data.data.latency_ms}ms)` 
-          : `API ${data.data.status} (${data.data.latency_ms}ms)`;
-        toast({ 
-          title: 'Health Check Complete', 
-          description: statusMsg,
-          variant: data.data.status === 'healthy' ? 'default' : 'destructive'
-        });
+        setLastHealthCheck(new Date());
+        if (!silent) {
+          const statusMsg = data.data.status === 'healthy' 
+            ? `API Healthy (${data.data.latency_ms}ms)` 
+            : `API ${data.data.status} (${data.data.latency_ms}ms)`;
+          toast({ 
+            title: 'Health Check Complete', 
+            description: statusMsg,
+            variant: data.data.status === 'healthy' ? 'default' : 'destructive'
+          });
+        }
       } else {
         throw new Error(data.error || 'Health check failed');
       }
     } catch (error: any) {
       setApiHealth({ status: 'offline', latency_ms: 0, checked_at: new Date().toISOString() });
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setLastHealthCheck(new Date());
+      if (!silent) {
+        toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      }
     } finally {
       setCheckingHealth(false);
     }
+  };
+
+  // Helper to get relative time
+  const getRelativeTime = (date: Date | null) => {
+    if (!date) return '';
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
   };
 
   const syncProducts = async () => {
@@ -489,21 +514,28 @@ export default function Admin() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {apiHealth && (
-              <Badge 
-                variant="outline" 
-                className={
-                  apiHealth.status === 'healthy' ? 'border-success/30 text-success' :
-                  apiHealth.status === 'degraded' ? 'border-warning/30 text-warning' :
-                  'border-destructive/30 text-destructive'
-                }
-              >
-                {apiHealth.status === 'healthy' ? <CheckCircle className="h-3 w-3 mr-1" /> :
-                 apiHealth.status === 'degraded' ? <Clock className="h-3 w-3 mr-1" /> :
-                 <XCircle className="h-3 w-3 mr-1" />}
-                API: {apiHealth.status} ({apiHealth.latency_ms}ms)
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge 
+                  variant="outline" 
+                  className={
+                    apiHealth.status === 'healthy' ? 'border-success/30 text-success' :
+                    apiHealth.status === 'degraded' ? 'border-warning/30 text-warning' :
+                    'border-destructive/30 text-destructive'
+                  }
+                >
+                  {apiHealth.status === 'healthy' ? <CheckCircle className="h-3 w-3 mr-1" /> :
+                   apiHealth.status === 'degraded' ? <Clock className="h-3 w-3 mr-1" /> :
+                   <XCircle className="h-3 w-3 mr-1" />}
+                  API: {apiHealth.status} ({apiHealth.latency_ms}ms)
+                </Badge>
+                {lastHealthCheck && (
+                  <span className="text-xs text-muted-foreground">
+                    Checked {getRelativeTime(lastHealthCheck)}
+                  </span>
+                )}
+              </div>
             )}
-            <Button variant="outline" size="sm" onClick={checkApiHealth} disabled={checkingHealth}>
+            <Button variant="outline" size="sm" onClick={() => checkApiHealth()} disabled={checkingHealth}>
               {checkingHealth ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Activity className="h-4 w-4 mr-1" />}
               Health
             </Button>
