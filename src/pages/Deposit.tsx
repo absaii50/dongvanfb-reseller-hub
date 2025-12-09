@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Wallet, 
@@ -35,6 +36,7 @@ export default function Deposit() {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { handleError, checkSession } = useErrorHandler();
   const [amount, setAmount] = useState('10');
   const [loading, setLoading] = useState(false);
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
@@ -121,11 +123,21 @@ export default function Deposit() {
 
     setLoading(true);
     try {
+      // Check session before creating payment
+      const isSessionValid = await checkSession();
+      if (!isSessionValid) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('nowpayments-create', {
         body: { amount: numAmount, currency: 'usd' }
       });
 
-      if (error) throw error;
+      if (error) {
+        await handleError(error, 'CreatePayment');
+        return;
+      }
 
       if (data.success && data.invoice_url) {
         setInvoiceUrl(data.invoice_url);
@@ -151,15 +163,10 @@ export default function Deposit() {
           description: 'Complete payment within 1 hour to avoid expiration.',
         });
       } else {
-        throw new Error(data.error || 'Failed to create payment');
+        await handleError(new Error(data.error || 'Failed to create payment'), 'CreatePayment');
       }
-    } catch (error: any) {
-      console.error('Payment error:', error);
-      toast({
-        title: 'Payment Error',
-        description: error.message || 'Failed to create payment. Please try again.',
-        variant: 'destructive',
-      });
+    } catch (error) {
+      await handleError(error, 'CreatePayment');
     } finally {
       setLoading(false);
     }
