@@ -6,20 +6,51 @@ export interface GeoIPData {
   ip: string;
 }
 
+// List of GeoIP API providers to try (fallback chain)
+const GEO_PROVIDERS = [
+  {
+    url: 'https://ipwho.is/',
+    parse: (data: any) => data.country_code,
+  },
+  {
+    url: 'https://api.country.is/',
+    parse: (data: any) => data.country,
+  },
+  {
+    url: 'https://ipapi.co/json/',
+    parse: (data: any) => data.country_code,
+  },
+];
+
 export async function getUserCountry(): Promise<string> {
-  try {
-    const res = await fetch('https://ipapi.co/json/', {
-      headers: { Accept: 'application/json' },
-    });
-    
-    if (!res.ok) throw new Error('Failed to fetch geo data');
-    
-    const data: GeoIPData = await res.json();
-    return data.country_code || 'UNKNOWN';
-  } catch (error) {
-    console.error('GeoIP detection failed:', error);
-    return 'UNKNOWN';
+  for (const provider of GEO_PROVIDERS) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
+      const res = await fetch(provider.url, {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) continue;
+      
+      const data = await res.json();
+      const countryCode = provider.parse(data);
+      
+      if (countryCode) {
+        return countryCode;
+      }
+    } catch (error) {
+      // Try next provider
+      continue;
+    }
   }
+  
+  console.warn('All GeoIP providers failed, using UNKNOWN');
+  return 'UNKNOWN';
 }
 
 // Supported countries for targeting
