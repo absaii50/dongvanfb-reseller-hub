@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useLiveStock } from '@/hooks/useLiveStock';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { Product } from '@/lib/types';
 import { 
-  ShoppingCart, 
   Loader2, 
   Mail,
   Wallet,
@@ -28,7 +28,8 @@ export default function Buy() {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { liveStock, isChecking, lastChecked } = useLiveStock();
+  const { liveStock, isChecking } = useLiveStock();
+  const { handleError, checkSession } = useErrorHandler();
   const [product, setProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -113,23 +114,13 @@ export default function Buy() {
     setPurchasing(true);
     try {
       // Check session before purchase
-      const { data: sessionData } = await supabase.auth.getSession();
-      console.log('Session check:', { 
-        hasSession: !!sessionData.session,
-        userId: sessionData.session?.user?.id 
-      });
-
-      if (!sessionData.session) {
-        toast({
-          title: 'Session Expired',
-          description: 'Please log in again to continue.',
-          variant: 'destructive',
-        });
-        navigate('/auth');
+      const isSessionValid = await checkSession();
+      if (!isSessionValid) {
+        setPurchasing(false);
         return;
       }
 
-      console.log('Starting purchase...', { 
+      console.log('[Purchase] Starting...', { 
         productId: product.id, 
         quantity, 
         totalPrice,
@@ -145,27 +136,14 @@ export default function Buy() {
         }
       });
 
-      console.log('Purchase response:', { data, error });
+      console.log('[Purchase] Response:', { data, error });
 
       if (error) {
-        console.error('Edge function error:', JSON.stringify(error, null, 2));
-        
-        // Check for auth errors (401)
-        const errorMessage = error.message || '';
-        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('non-2xx')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please log in again.',
-            variant: 'destructive',
-          });
-          await supabase.auth.signOut();
-          navigate('/auth');
-          return;
-        }
-        throw error;
+        await handleError(error, 'Purchase');
+        return;
       }
 
-      if (data.success) {
+      if (data?.success) {
         await refreshProfile();
         toast({
           title: 'Purchase Successful!',
@@ -173,15 +151,10 @@ export default function Buy() {
         });
         navigate('/dashboard');
       } else {
-        throw new Error(data.error || 'Purchase failed');
+        await handleError(new Error(data?.error || 'Purchase failed'), 'Purchase');
       }
-    } catch (error: any) {
-      console.error('Purchase error details:', JSON.stringify(error, null, 2));
-      toast({
-        title: 'Purchase Failed',
-        description: error.message || 'Failed to complete purchase. Please try again.',
-        variant: 'destructive',
-      });
+    } catch (error) {
+      await handleError(error, 'Purchase');
     } finally {
       setPurchasing(false);
     }
