@@ -1044,28 +1044,35 @@ export default function Admin() {
                             <td className="py-3 px-2 text-center">
                               <Badge variant={popup.is_active ? 'default' : 'secondary'}>{popup.is_active ? 'Active' : 'Inactive'}</Badge>
                             </td>
-                          <td className="py-3 px-2 text-right">
-                            <div className="flex gap-1 justify-end">
-                              <Button variant="ghost" size="sm" onClick={() => {
-                                setEditingPopup(popup);
-                                setPopupForm({
-                                  title: popup.title,
-                                  message: popup.message,
-                                  image_url: popup.image_url || '',
-                                  button_text: popup.button_text || 'OK',
-                                  button_link: popup.button_link || '',
-                                  target_countries: popup.target_countries || [],
-                                  is_active: popup.is_active,
-                                  priority: popup.priority
-                                });
-                              }}><Edit className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => deletePopup(popup.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            <td className="py-3 px-2 text-right">
+                              <div className="flex gap-1 justify-end">
+                                <Button variant="ghost" size="sm" onClick={() => {
+                                  setEditingPopup(popup);
+                                  setPopupForm({
+                                    title: popup.title,
+                                    message: popup.message,
+                                    image_url: popup.image_url || '',
+                                    button_text: popup.button_text || 'OK',
+                                    button_link: popup.button_link || '',
+                                    target_countries: popup.target_countries || [],
+                                    is_active: popup.is_active,
+                                    priority: popup.priority
+                                  });
+                                }}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => deletePopup(popup.id)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                       {popups.length === 0 && (
-                        <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No popups created yet.</td></tr>
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-muted-foreground">No popups created yet.</td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
