@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { MailMessage } from '@/lib/types';
+import { parseError, isAuthError } from '@/lib/errorHandler';
 import { 
   Mail, 
   Loader2, 
@@ -34,6 +36,7 @@ interface BulkMailResult {
 
 export default function Tools() {
   const { toast } = useToast();
+  const { handleError } = useErrorHandler();
   const [loading, setLoading] = useState(false);
   
   // Mode toggle
@@ -85,7 +88,14 @@ export default function Tools() {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's an auth error
+        if (isAuthError(error)) {
+          await handleError(error, 'ReadMailbox');
+          return;
+        }
+        throw error;
+      }
 
       if (data.success && data.data) {
         setMessages(data.data);
@@ -96,11 +106,11 @@ export default function Tools() {
       } else {
         throw new Error(data.message || data.error || 'Failed to read mailbox');
       }
-    } catch (error: any) {
-      console.error('Read mailbox error:', error);
+    } catch (error) {
+      const parsed = parseError(error);
       toast({
-        title: 'Error',
-        description: error.message || 'Failed to read mailbox.',
+        title: parsed.message,
+        description: parsed.details,
         variant: 'destructive',
       });
     } finally {
@@ -157,7 +167,15 @@ export default function Tools() {
           }
         });
 
-        if (error) throw error;
+        if (error) {
+          // Check for auth errors in bulk mode
+          if (isAuthError(error)) {
+            await handleError(error, 'BulkReadMailbox');
+            setLoading(false);
+            return;
+          }
+          throw error;
+        }
 
         if (data.success && data.data) {
           results.push({
@@ -173,12 +191,13 @@ export default function Tools() {
             error: data.message || data.error || 'Failed to read mailbox'
           });
         }
-      } catch (error: any) {
+      } catch (error) {
+        const parsed = parseError(error);
         results.push({
           email: emailAddr,
           success: false,
           messages: [],
-          error: error.message || 'Failed to read mailbox'
+          error: parsed.message
         });
       }
 

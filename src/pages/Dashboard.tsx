@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { Order, Deposit, MailData } from '@/lib/types';
 import { 
   Wallet, 
@@ -35,6 +36,7 @@ import {
 export default function Dashboard() {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const { handleError } = useErrorHandler();
   const [orders, setOrders] = useState<Order[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +111,9 @@ export default function Dashboard() {
           .limit(10),
       ]);
 
+      if (ordersRes.error) throw ordersRes.error;
+      if (depositsRes.error) throw depositsRes.error;
+
       if (ordersRes.data) {
         setOrders(ordersRes.data.map(o => ({
           ...o,
@@ -120,7 +125,7 @@ export default function Dashboard() {
         setDeposits(depositsRes.data.map(d => ({ ...d, amount: Number(d.amount) })));
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      await handleError(error, 'FetchDashboardData');
     } finally {
       setLoading(false);
     }
