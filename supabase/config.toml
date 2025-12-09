@@ -14,3 +14,9 @@ verify_jwt = true
 
 [functions.expire-deposits]
 verify_jwt = false
+
+[functions.cryptomus-create]
+verify_jwt = true
+
+[functions.cryptomus-webhook]
+verify_jwt = false
