@@ -130,7 +130,7 @@ export default function Deposit() {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('nowpayments-create', {
+      const { data, error } = await supabase.functions.invoke('cryptomus-create', {
         body: { amount: numAmount, currency: 'usd' }
       });
 
@@ -381,7 +381,7 @@ export default function Deposit() {
                       <p>• This payment has expired. Create a new payment to continue.</p>
                     ) : (
                       <>
-                        <p>• Complete payment on the NOWPayments page</p>
+                        <p>• Complete payment on the Cryptomus page</p>
                         <p>• Your balance will update automatically after confirmation</p>
                         <p>• Status updates in real-time - no need to refresh</p>
                       </>
