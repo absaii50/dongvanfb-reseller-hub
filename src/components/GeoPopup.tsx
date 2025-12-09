@@ -47,6 +47,7 @@ export function GeoPopup() {
         }
 
         // 3. Find matching popup (country-specific or universal)
+        // When GeoIP fails (UNKNOWN), still show universal popups
         const matchingPopup = popups.find((p: Popup) => {
           // Check if already dismissed
           const dismissed = localStorage.getItem(`${POPUP_DISMISSED_PREFIX}${p.id}`);
@@ -59,6 +60,11 @@ export function GeoPopup() {
           // Check country targeting
           const isUniversal = !p.target_countries || p.target_countries.length === 0;
           const matchesCountry = p.target_countries?.includes(countryCode);
+          
+          // If GeoIP failed (UNKNOWN), only show universal popups
+          if (countryCode === 'UNKNOWN') {
+            return isUniversal;
+          }
           
           return isUniversal || matchesCountry;
         });
