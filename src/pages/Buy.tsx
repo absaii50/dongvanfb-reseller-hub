@@ -112,6 +112,30 @@ export default function Buy() {
 
     setPurchasing(true);
     try {
+      // Check session before purchase
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('Session check:', { 
+        hasSession: !!sessionData.session,
+        userId: sessionData.session?.user?.id 
+      });
+
+      if (!sessionData.session) {
+        toast({
+          title: 'Session Expired',
+          description: 'Please log in again to continue.',
+          variant: 'destructive',
+        });
+        navigate('/auth');
+        return;
+      }
+
+      console.log('Starting purchase...', { 
+        productId: product.id, 
+        quantity, 
+        totalPrice,
+        userId: user.id
+      });
+
       const { data, error } = await supabase.functions.invoke('dongvan-api', {
         body: { 
           action: 'buy_mail',
@@ -121,7 +145,25 @@ export default function Buy() {
         }
       });
 
-      if (error) throw error;
+      console.log('Purchase response:', { data, error });
+
+      if (error) {
+        console.error('Edge function error:', JSON.stringify(error, null, 2));
+        
+        // Check for auth errors (401)
+        const errorMessage = error.message || '';
+        if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('non-2xx')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please log in again.',
+            variant: 'destructive',
+          });
+          await supabase.auth.signOut();
+          navigate('/auth');
+          return;
+        }
+        throw error;
+      }
 
       if (data.success) {
         await refreshProfile();
@@ -134,7 +176,7 @@ export default function Buy() {
         throw new Error(data.error || 'Purchase failed');
       }
     } catch (error: any) {
-      console.error('Purchase error:', error);
+      console.error('Purchase error details:', JSON.stringify(error, null, 2));
       toast({
         title: 'Purchase Failed',
         description: error.message || 'Failed to complete purchase. Please try again.',
