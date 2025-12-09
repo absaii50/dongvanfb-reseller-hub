@@ -67,6 +67,7 @@ export default function Admin() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [popups, setPopups] = useState<Popup[]>([]);
+  const [popupAnalytics, setPopupAnalytics] = useState<Record<string, { views: number; clicks: number; dismisses: number }>>({});
   const [apiBalance, setApiBalance] = useState<number | null>(null);
   const [apiHealth, setApiHealth] = useState<{ status: string; latency_ms: number; checked_at: string } | null>(null);
   const [lastHealthCheck, setLastHealthCheck] = useState<Date | null>(null);
@@ -131,12 +132,13 @@ export default function Admin() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, ordersRes, usersRes, depositsRes, popupsRes] = await Promise.all([
+      const [productsRes, ordersRes, usersRes, depositsRes, popupsRes, analyticsRes] = await Promise.all([
         supabase.from('products').select('*').order('created_at', { ascending: false }),
         supabase.from('orders').select('*, product:products(*)').order('created_at', { ascending: false }).limit(100),
         supabase.from('profiles').select('*').order('created_at', { ascending: false }),
         supabase.from('deposits').select('*').order('created_at', { ascending: false }).limit(100),
         supabase.from('popups').select('*').order('priority', { ascending: false }),
+        supabase.from('popup_analytics').select('popup_id, event_type'),
       ]);
 
       if (productsRes.data) setProducts(productsRes.data.map(p => ({ ...p, price: Number(p.price) })));
@@ -144,6 +146,20 @@ export default function Admin() {
       if (usersRes.data) setUsers(usersRes.data.map(u => ({ ...u, balance: Number(u.balance) })));
       if (depositsRes.data) setDeposits(depositsRes.data.map(d => ({ ...d, amount: Number(d.amount) })));
       if (popupsRes.data) setPopups(popupsRes.data as Popup[]);
+      
+      // Aggregate popup analytics
+      if (analyticsRes.data) {
+        const aggregated: Record<string, { views: number; clicks: number; dismisses: number }> = {};
+        analyticsRes.data.forEach((event: { popup_id: string; event_type: string }) => {
+          if (!aggregated[event.popup_id]) {
+            aggregated[event.popup_id] = { views: 0, clicks: 0, dismisses: 0 };
+          }
+          if (event.event_type === 'view') aggregated[event.popup_id].views++;
+          else if (event.event_type === 'click') aggregated[event.popup_id].clicks++;
+          else if (event.event_type === 'dismiss') aggregated[event.popup_id].dismisses++;
+        });
+        setPopupAnalytics(aggregated);
+      }
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -444,6 +460,27 @@ export default function Admin() {
       is_active: true,
       priority: 0
     });
+  };
+
+  const createTestUniversalPopup = async () => {
+    try {
+      const { error } = await supabase.from('popups').insert({
+        title: '🎉 Test Universal Popup',
+        message: 'This is a test universal popup that displays to all countries regardless of GeoIP detection. It verifies the popup system is working correctly.',
+        button_text: 'Got it!',
+        button_link: null,
+        target_countries: [],
+        is_active: true,
+        priority: 100
+      });
+      
+      if (error) throw error;
+      
+      toast({ title: 'Success', description: 'Test universal popup created! Clear localStorage to see it.' });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
   };
 
   // Export functions
@@ -935,14 +972,19 @@ export default function Admin() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Geo Popups</CardTitle>
-                  <CardDescription>Manage notification popups by country</CardDescription>
+                  <CardDescription>Manage notification popups by country with analytics</CardDescription>
                 </div>
-                <Button onClick={() => {
-                  resetPopupForm();
-                  setEditingPopup({} as Popup);
-                }}>
-                  <Plus className="h-4 w-4 mr-1" />Add Popup
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={createTestUniversalPopup}>
+                    <Globe className="h-4 w-4 mr-1" />Test Universal
+                  </Button>
+                  <Button onClick={() => {
+                    resetPopupForm();
+                    setEditingPopup({} as Popup);
+                  }}>
+                    <Plus className="h-4 w-4 mr-1" />Add Popup
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -951,36 +993,57 @@ export default function Admin() {
                       <tr className="border-b border-border/50">
                         <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Title</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Countries</th>
+                        <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Analytics</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Priority</th>
                         <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">Status</th>
                         <th className="text-right py-3 px-2 text-sm font-medium text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {popups.map((popup) => (
-                        <tr key={popup.id} className="border-b border-border/30">
-                          <td className="py-3 px-2">
-                            <div>
-                              <p className="font-medium">{popup.title}</p>
-                              <p className="text-sm text-muted-foreground line-clamp-1">{popup.message}</p>
-                            </div>
-                          </td>
-                          <td className="py-3 px-2 text-center">
-                            {popup.target_countries?.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 justify-center">
-                                {popup.target_countries.map(code => {
-                                  const country = SUPPORTED_COUNTRIES.find(c => c.code === code);
-                                  return <Badge key={code} variant="outline" className="text-xs">{country?.flag} {code}</Badge>;
-                                })}
+                      {popups.map((popup) => {
+                        const stats = popupAnalytics[popup.id] || { views: 0, clicks: 0, dismisses: 0 };
+                        const ctr = stats.views > 0 ? ((stats.clicks / stats.views) * 100).toFixed(1) : '0.0';
+                        return (
+                          <tr key={popup.id} className="border-b border-border/30">
+                            <td className="py-3 px-2">
+                              <div>
+                                <p className="font-medium">{popup.title}</p>
+                                <p className="text-sm text-muted-foreground line-clamp-1">{popup.message}</p>
                               </div>
-                            ) : (
-                              <Badge className="bg-primary/20 text-primary"><Globe className="h-3 w-3 mr-1" />Universal</Badge>
-                            )}
-                          </td>
-                          <td className="py-3 px-2 text-center">{popup.priority}</td>
-                          <td className="py-3 px-2 text-center">
-                            <Badge variant={popup.is_active ? 'default' : 'secondary'}>{popup.is_active ? 'Active' : 'Inactive'}</Badge>
-                          </td>
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              {popup.target_countries?.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 justify-center">
+                                  {popup.target_countries.map(code => {
+                                    const country = SUPPORTED_COUNTRIES.find(c => c.code === code);
+                                    return <Badge key={code} variant="outline" className="text-xs">{country?.flag} {code}</Badge>;
+                                  })}
+                                </div>
+                              ) : (
+                                <Badge className="bg-primary/20 text-primary"><Globe className="h-3 w-3 mr-1" />Universal</Badge>
+                              )}
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <div className="flex flex-col gap-1 text-xs">
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-muted-foreground">Views:</span>
+                                  <span className="font-medium">{stats.views}</span>
+                                </div>
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-muted-foreground">Clicks:</span>
+                                  <span className="font-medium text-success">{stats.clicks}</span>
+                                  <span className="text-muted-foreground">({ctr}%)</span>
+                                </div>
+                                <div className="flex items-center justify-center gap-2">
+                                  <span className="text-muted-foreground">Dismissed:</span>
+                                  <span className="font-medium text-warning">{stats.dismisses}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-2 text-center">{popup.priority}</td>
+                            <td className="py-3 px-2 text-center">
+                              <Badge variant={popup.is_active ? 'default' : 'secondary'}>{popup.is_active ? 'Active' : 'Inactive'}</Badge>
+                            </td>
                           <td className="py-3 px-2 text-right">
                             <div className="flex gap-1 justify-end">
                               <Button variant="ghost" size="sm" onClick={() => {
@@ -1002,7 +1065,7 @@ export default function Admin() {
                         </tr>
                       ))}
                       {popups.length === 0 && (
-                        <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No popups created yet.</td></tr>
+                        <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No popups created yet.</td></tr>
                       )}
                     </tbody>
                   </table>

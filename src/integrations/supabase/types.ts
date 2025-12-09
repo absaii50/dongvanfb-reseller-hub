@@ -94,6 +94,38 @@ export type Database = {
           },
         ]
       }
+      popup_analytics: {
+        Row: {
+          country_code: string | null
+          created_at: string
+          event_type: string
+          id: string
+          popup_id: string
+        }
+        Insert: {
+          country_code?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          popup_id: string
+        }
+        Update: {
+          country_code?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          popup_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "popup_analytics_popup_id_fkey"
+            columns: ["popup_id"]
+            isOneToOne: false
+            referencedRelation: "popups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       popups: {
         Row: {
           button_link: string | null

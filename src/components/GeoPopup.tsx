@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,17 +22,33 @@ const POPUP_STORAGE_PREFIX = 'popup_seen_';
 const POPUP_DISMISSED_PREFIX = 'popup_dismissed_';
 const MAX_VIEWS = 2;
 
+// Track analytics event
+const trackPopupEvent = async (popupId: string, eventType: 'view' | 'click' | 'dismiss', countryCode: string) => {
+  try {
+    await supabase.from('popup_analytics').insert({
+      popup_id: popupId,
+      event_type: eventType,
+      country_code: countryCode
+    });
+  } catch (error) {
+    console.error('Failed to track popup event:', error);
+  }
+};
+
 export function GeoPopup() {
   const [popup, setPopup] = useState<Popup | null>(null);
   const [open, setOpen] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userCountry, setUserCountry] = useState<string>('UNKNOWN');
+  const viewTrackedRef = useRef(false);
 
   useEffect(() => {
     const loadPopup = async () => {
       try {
         // 1. Get user's country
         const countryCode = await getUserCountry();
+        setUserCountry(countryCode);
         
         // 2. Fetch active popups
         const { data: popups, error } = await supabase
@@ -73,9 +89,15 @@ export function GeoPopup() {
           setPopup(matchingPopup);
           setOpen(true);
           
-          // Increment view count
+          // Increment view count in localStorage
           const currentViews = parseInt(localStorage.getItem(`${POPUP_STORAGE_PREFIX}${matchingPopup.id}`) || '0', 10);
           localStorage.setItem(`${POPUP_STORAGE_PREFIX}${matchingPopup.id}`, String(currentViews + 1));
+          
+          // Track view event (only once per popup load)
+          if (!viewTrackedRef.current) {
+            viewTrackedRef.current = true;
+            trackPopupEvent(matchingPopup.id, 'view', countryCode);
+          }
         }
       } catch (error) {
         console.error('Error loading popup:', error);
@@ -90,15 +112,25 @@ export function GeoPopup() {
   }, []);
 
   const handleClose = () => {
-    if (dontShowAgain && popup) {
-      localStorage.setItem(`${POPUP_DISMISSED_PREFIX}${popup.id}`, 'true');
+    if (popup) {
+      // Track dismiss event
+      trackPopupEvent(popup.id, 'dismiss', userCountry);
+      
+      if (dontShowAgain) {
+        localStorage.setItem(`${POPUP_DISMISSED_PREFIX}${popup.id}`, 'true');
+      }
     }
     setOpen(false);
   };
 
   const handleButtonClick = () => {
-    if (popup?.button_link) {
-      window.open(popup.button_link, '_blank');
+    if (popup) {
+      // Track click event
+      trackPopupEvent(popup.id, 'click', userCountry);
+      
+      if (popup.button_link) {
+        window.open(popup.button_link, '_blank');
+      }
     }
     handleClose();
   };
