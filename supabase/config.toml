@@ -1,11 +1,5 @@
 project_id = "zopyyirugnourtelzelm"
 
-[functions.nowpayments-webhook]
-verify_jwt = false
-
-[functions.nowpayments-create]
-verify_jwt = true
-
 [functions.dongvan-api]
 verify_jwt = false
 

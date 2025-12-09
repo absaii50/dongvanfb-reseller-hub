@@ -23,7 +23,7 @@ const isValidCurrency = (val: unknown): val is string => {
   return typeof val === 'string' && ALLOWED_CURRENCIES.includes(val.toLowerCase());
 };
 
-// Cryptomus signature generation
+// Cryptomus signature generation using MD5
 async function generateSignature(data: Record<string, unknown>, apiKey: string): Promise<string> {
   const jsonData = JSON.stringify(data);
   const base64Data = btoa(jsonData);
